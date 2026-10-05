@@ -1,11 +1,26 @@
 {
   "release": "bikesy-graph-stairs-2026-10-05",
   "deployment": "dpl_BtTTmSJySvMUJhDidyCTdtwMMph6",
-  "verified_url": "https://bikesy-backend-4r2gr9l6e-blinktag.vercel.app/stage",
+  "verified_url": "https://api.bikesy.com/route?lat1=37.77201&lng1=-122.45189&lat2=37.76131&lng2=-122.42157&scenario=5",
   "runtime_image": "vcr.vercel.com/blinktag/bikesy-backend/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1",
   "image_bytes": 642651541,
   "engine_sha256": "82c32a1218531ac87de394699791212e32989147f3c17b705140cbac35fa755d",
   "runtime_files": {
+    "serve.mjs": "88cedb3e34ade52cad1270ed40ffbd577a5431407f0700b8804f96fe7a38915a",
+    "stage.html": "f47337b45c4c5c7b43e8656a88f438e4f0c26d500f0f90e0a34377c04a472b70",
+    "config/sample.json": "2d52d512cccaba4161e93b975b1e3c3ba33c5ff1a566dac3728f49d9f3049d09",
+    "src/adapter.js": "07048485b95378760ba2e13e222d5d061809c39b664c459170b95ae1d334ad82",
+    "src/server.js": "0ab1c0fc23ca804ca377eb4d9c415b63de1b50d69d25dafb0f312ffc43d53262",
+    "src/stage-elevation.js": "5c7e02327c24a94524a6be9d83373eb9f3a146895984d51f827c4050217d5cd9",
+    "src/config.js": "9a5b9c1e88998dd9a644f879aa04875ea8f9d649fff0e6ed75fa6f22d6acb691",
+    "src/polyline.js": "b944a28117db5b3e0dabe3d3b2ff75ad3deb7bd4cc48e7008f46284a9b7b1cb6"
+  },
+  "data_lock_sha256": "76f440b28f1d37f3eb74fd8dbd197363aa1a50ae06eb71cc5979c8a6696d46e5",
+  "upstream_runtime": "ghcr.io/valhalla/valhalla@sha256:f58558b2164ec7fa6f6ee9199cea06e18ac8217da24e7faa7718ea526a88ac1a",
+  "git_deployment_verified": false,
+  "private_base_pull_in_vercel_build_verified": false,
+  "verified_url_checked_at": "2026-10-05T20:07:44.171538+00:00",
+  "deployed_baseline_files": {
     "serve.mjs": "88cedb3e34ade52cad1270ed40ffbd577a5431407f0700b8804f96fe7a38915a",
     "stage.html": "760389ce8ffa11627c0c3d99cd498fb36db010b9c98a0d3403d9fc38b6111953",
     "config/sample.json": "2d52d512cccaba4161e93b975b1e3c3ba33c5ff1a566dac3728f49d9f3049d09",
@@ -15,8 +30,6 @@
     "src/config.js": "9a5b9c1e88998dd9a644f879aa04875ea8f9d649fff0e6ed75fa6f22d6acb691",
     "src/polyline.js": "b944a28117db5b3e0dabe3d3b2ff75ad3deb7bd4cc48e7008f46284a9b7b1cb6"
   },
-  "data_lock_sha256": "76f440b28f1d37f3eb74fd8dbd197363aa1a50ae06eb71cc5979c8a6696d46e5",
-  "upstream_runtime": "ghcr.io/valhalla/valhalla@sha256:f58558b2164ec7fa6f6ee9199cea06e18ac8217da24e7faa7718ea526a88ac1a",
-  "git_deployment_verified": false,
-  "private_base_pull_in_vercel_build_verified": false
+  "source_changed_from_deployed": true,
+  "source_updated_at": "2026-10-05T20:08:08.494Z"
 }

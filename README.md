@@ -6,8 +6,8 @@ Git-ready source for the corrected regional import and counted-stairs engine dep
 
 ## Start here
 
-1. Read [deployment setup](docs/DEPLOY.md), including the one-time Git connection and private-base build check.
-2. Put this directory at the root of your GitHub repository. No Git repository or remote was created for you.
+1. The production backend is [api.bikesy.com](https://api.bikesy.com); the canonical routing endpoint is `/route`.
+2. Use the [API examples below](#api-examples) for requests, responses and compatibility details.
 3. Run source checks with Node 22+ and Python 3.12; there are no npm dependencies:
 
 ```sh
@@ -18,11 +18,11 @@ npm run verify:release
 python3 engine/apply_patch.py --check
 ```
 
-Current package validation and its limits are in [VALIDATION.md](docs/VALIDATION.md). Source hashes in `release.json` match the verified deployed runtime. Packaging metadata, extra test helpers, Docker layering and documentation are new; they do not change route behavior.
+Current package validation and its limits are in [VALIDATION.md](docs/VALIDATION.md). Source hashes in `release.json` identify the current local runtime source; source changes still require deployment. The pinned engine and routing-data image remain unchanged.
 
 ## Run locally
 
-With Docker access to the private VCR base (see deployment guide):
+With Docker access to the private VCR base (see [Where the data comes from](#where-the-data-comes-from)):
 
 ```sh
 docker build --platform linux/amd64 -f Dockerfile.vercel -t bikesy:local .
@@ -30,25 +30,29 @@ docker run --rm --name bikesy-local --platform linux/amd64 --cpus 2 --memory 2g 
   -p 127.0.0.1:8080:80 bikesy:local
 ```
 
-Open `http://127.0.0.1:8080/stage`; health is `/health`. Apple Silicon uses amd64 emulation. This starts the new Valhalla backend only. The comparison page calls the public historical Bikesy API for its Old column; the packaged backend does not launch a legacy server. Stop the container with Ctrl-C. For JS-only development against an already running Valhalla engine, use `npm run start:adapter` and the variables in `.env.example`.
+The production comparison page is [api.bikesy.com/stage](https://api.bikesy.com/stage), and health is [api.bikesy.com/health](https://api.bikesy.com/health). The Docker command above deliberately binds only to the local loopback interface; for local development, open `/stage` on that mapped port. Apple Silicon uses amd64 emulation. This starts the new Valhalla backend only. The comparison page calls the public historical Bikesy API for its Old column; the packaged backend does not launch a legacy server. Stop the container with Ctrl-C. For JS-only development against an already running Valhalla engine, use `npm run start:adapter` and the variables in `.env.example`.
 
 ## API examples
 
-After starting the local container above, request the public comparison page's **Wiggle · Fell to Valencia** trip:
+Request the **Wiggle · Fell to Valencia** trip from the production backend. Full API URL:
+
+https://api.bikesy.com/route?lat1=37.77201&lng1=-122.45189&lat2=37.76131&lng2=-122.42157&scenario=5
+
+Copy-paste request:
 
 ```sh
-BASE_URL='http://127.0.0.1:8080'
-curl --get "$BASE_URL/api/route" \
-  --data-urlencode 'lat1=37.77201183539485' \
-  --data-urlencode 'lng1=-122.45188647879988' \
-  --data-urlencode 'lat2=37.761314357988724' \
-  --data-urlencode 'lng2=-122.42157490354151' \
+BASE_URL='https://api.bikesy.com'
+curl --get "$BASE_URL/route" \
+  --data-urlencode 'lat1=37.77201' \
+  --data-urlencode 'lng1=-122.45189' \
+  --data-urlencode 'lat2=37.76131' \
+  --data-urlencode 'lng2=-122.42157' \
   --data-urlencode 'scenario=5'
 ```
 
-For a deployed backend, replace `BASE_URL` with its actual HTTPS origin, without a trailing slash. A protected Vercel deployment also requires authorized access. The examples do not depend on a particular staging URL; `bikesy.com` currently serves the historical comparison API.
+`BASE_URL` defaults to the production backend. Override it only when deliberately testing a local instance or a protected Preview deployment. The comparison page uses same-origin requests for the new backend and keeps the historical Bikesy API for its Old column; the old API is a separate comparison source.
 
-`lat1`/`lng1` are the start and `lat2`/`lng2` are the destination, in decimal degrees. All four are required and must lie within the configured bounds. `scenario` is optional and defaults to `1` when missing or empty. Route aliases are `/route`, `/`, `/api.php` and `/api.php/`; all accept the same query. `HEAD` and CORS `OPTIONS` are supported. `GET /api/bounds` (also `/bounds`) returns the service area, and `GET /health` returns `{"status":"ok"}`.
+`lat1`/`lng1` are the start and `lat2`/`lng2` are the destination, in decimal degrees. All four are required and must lie within the configured bounds. `scenario` is optional and defaults to `1` when missing or empty. The canonical route is `/route`. Compatibility aliases `/api/route`, `/`, `/api.php` and `/api.php/` accept the same query and remain supported. `HEAD` and CORS `OPTIONS` are supported. `GET /bounds` (also `/api/bounds`) returns the service area, and `GET /health` returns `{"status":"ok"}`.
 
 The active Bay Area configuration maps all nine scenarios as follows:
 
@@ -62,24 +66,52 @@ These are preferences, not guarantees about distance or elevation. Scenario 9 re
 
 ### Success response
 
-HTTP **200** returns the legacy-compatible JSON shape below. This saved example is derived from [`valhalla-current-sf-wiggle.json`](test/fixtures/valhalla-current-sf-wiggle.json), a separate Wiggle fixture with start `(37.7701073, -122.4537431)`, destination `(37.7845765, -122.4073571)` and scenario `7`. Its captured geometry and distance can differ from a new data release. **Shortened sample:** only the first two directions and first three elevation samples are shown; `path` and `total_distance` are complete, and `stats` is omitted.
+HTTP **200** returned this response for the exact production URL above on October 5, 2026. **Shortened sample:** only the first two directions and first three elevation samples are shown; `path`, `total_distance` and observed `stats` are complete. Direction coordinates are rounded to five decimal places for this display only; the API retains its original coordinate precision. Routes can change with routing-data updates, and timings vary per request.
 
 ```json
 {
   "directions": [
-    ["start north", "Stanyan Street", [-122.453743, 37.770107]],
-    ["sharp left", "Stanyan Street", [-122.45397, 37.771603]]
+    [
+      "start east",
+      "nameless",
+      [
+        -122.45190,
+        37.77206
+      ]
+    ],
+    [
+      "left",
+      "nameless",
+      [
+        -122.44103,
+        37.77352
+      ]
+    ]
   ],
   "path": [
-    "c~oeFzvkjVuDb@QGcBPHVZEOi@QkBGWUa@M{@e@m@E_@MgESiAEcA@iCFwA@i@Sy@]m@Ka@Ga@Ca@CmBC_@UyA@UNqA?QO]]a@E[SiE?yAOq@E{AIaAAaAHcAEs@EMYeCSy@S]KmAWQ{Dd@}Ba^oPnByJc|Aa@mGCkAc@eHaEf@cEeo@GsAJaAJ_@jAaBaJ{L_BtBoBoC",
-    "B??@????????@???????????????????????????@????@?@@@???@@?@??@@@B"
+    "kjpeFhkkjVEoBSiAEcA@iCFwA@i@Sy@]m@Ka@Ga@Ca@CmBC_@UyA@UNqA?QO]]a@E[SiE?yAOq@E{AIaAAaAFk@?q@c@mDKg@GQS]KmAWQrDc@yBc^tJkAsAoSdOiBAi@fJa@nCOpMg@tI_@kBiw@lKg@",
+    "B?????????????????????????????????@@@@@?@???@@B"
   ],
-  "total_distance": 5278,
+  "total_distance": 4121,
   "elevation_profile": [
-    [0, 80.61],
-    [18, 80.04],
-    [36, 79.62]
-  ]
+    [
+      0,
+      76.47
+    ],
+    [
+      14,
+      76.14
+    ],
+    [
+      28,
+      75.84
+    ]
+  ],
+  "stats": {
+    "route_find_time": 0.19999127399999997,
+    "route_desc_time": 0.017236383999999817,
+    "endpoint_find_time": 0
+  }
 }
 ```
 
@@ -102,7 +134,7 @@ Clients must check for an `error` field even on **HTTP 200**. Legacy validation 
 Missing coordinates:
 
 ```sh
-curl -i "$BASE_URL/api/route"
+curl -i "$BASE_URL/route"
 ```
 
 HTTP **200**:
@@ -129,7 +161,7 @@ Other errors use the same envelope: HTTP 200 for `No route found` or `Location o
 
 - Application change: edit `src/`, `serve.mjs`, `stage.html` or `config/sample.json`; test; run `node scripts/lock-source.mjs` to update source hashes; commit both code and `release.json`. The data image remains pinned.
 - Engine/data change: follow [DATA.md](docs/DATA.md), validate a separate rebuilt release, publish a new immutable image after approval, and update the digest plus data/engine locks in one commit. Never mix old graph IDs with new indexes.
-- API contract and scenario mapping: [API.md](docs/API.md).
+- API contract and scenario mapping: [API examples](#api-examples).
 
 Existing limitations remain: bridge hours/closures are static, timezone data is absent, route-distance ordering and some regional detours/duplicates remain, unknown stair counts use a length fallback, and DEM heights are estimates. Tahoe configuration is retained for contract tests; this data image serves the Bay Area only.
 

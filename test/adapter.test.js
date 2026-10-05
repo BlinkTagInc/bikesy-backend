@@ -102,16 +102,21 @@ async function request(path, method = 'GET', fetchImpl = stub().fetch) {
   return { status: res.statusCode, body: res.body && JSON.parse(res.body), headers };
 }
 test('HTTP contract through handler, without starting any server', async () => {
-  for (const path of ['/', '/route', '/api/route']) assert.equal((await request(path + '?' + query())).body.total_distance, 2340);
+  for (const path of ['/route', '/api/route', '/', '/api.php', '/api.php/', 'https://api.bikesy.com/route']) {
+    assert.equal((await request(path + '?' + query())).body.total_distance, 2340);
+    const missing = await request(path);
+    assert.equal(missing.status, 200);
+    assert.deepEqual(missing.body, { error: 'No `lat1` specified' });
+  }
   for (const path of ['/bounds', '/api/bounds']) assert.deepEqual((await request(path)).body, config.bounds);
-  assert.deepEqual((await request('/api/route')).body, { error: 'No `lat1` specified' });
-  assert.equal((await request('/api/route')).status, 200);
+  assert.deepEqual((await request('/route')).body, { error: 'No `lat1` specified' });
+  assert.equal((await request('/route')).status, 200);
   assert.equal((await request('/bad')).status, 404);
   assert.equal((await request('/', 'POST')).status, 405);
   assert.equal((await request('/', 'OPTIONS')).status, 204);
   assert.equal((await request('/bounds', 'HEAD')).body, undefined);
   assert.equal((await request('/bounds')).headers['Access-Control-Allow-Origin'], '*');
-  assert.equal((await request('/api/route?' + query(), 'GET', async () => { throw Error(); })).status, 502);
+  assert.equal((await request('/route?' + query(), 'GET', async () => { throw Error(); })).status, 502);
 });
 test('live legacy capture and adapter have the same successful response structure', async () => {
   const legacy = JSON.parse(readFileSync(new URL('./fixtures/legacy-sf-scenario5.json', import.meta.url)));
@@ -208,7 +213,7 @@ test('geometry budgets bound decoded size and pathological simplification work',
 test('handler disconnect wiring cancels upstream and removes event listeners', async () => {
   const { EventEmitter } = await import('node:events');
   for (const event of ['aborted', 'close']) {
-    const req = Object.assign(new EventEmitter(), { url: '/api/route?' + query(), method: 'GET' });
+    const req = Object.assign(new EventEmitter(), { url: '/route?' + query(), method: 'GET' });
     const res = Object.assign(new EventEmitter(), { setHeader() {}, end() { throw Error('must not write to destroyed response'); } });
     let cancelled = false;
     const pending = createHandler(config, async () => new Response(new ReadableStream({ cancel() { cancelled = true; } })))(req, res);

@@ -23,11 +23,12 @@ export function createHandler(config, fetchImpl) {
     req.once?.('aborted', cancel);
     res.once?.('close', cancel);
     try {
-      const url = new URL(req.url, 'http://bikesy.local');
+      const url = new URL(req.url, 'https://api.bikesy.com');
       if (['/bounds', '/api/bounds'].includes(url.pathname)) { send(200, config.bounds); return; }
       if (url.pathname === '/health') { send(200, { status: 'ok' }); return; }
-      // The published mobile client uses api.php followed by a slash before its query.
-      if (!['/', '/route', '/api/route', '/api.php', '/api.php/'].includes(url.pathname)) {
+      // /route is canonical at https://api.bikesy.com. Keep legacy aliases,
+      // including the published mobile client's api.php/ URL.
+      if (!['/route', '/api/route', '/', '/api.php', '/api.php/'].includes(url.pathname)) {
         send(404, { error: 'Not found' });
         return;
       }

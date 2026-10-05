@@ -1,3 +1,5 @@
+The canonical current backend is `https://api.bikesy.com/route`. URLs below record the original capture sources and must remain unchanged for provenance.
+
 `legacy-sf-scenario5.json` is an unmodified successful response fetched 2026-10-01 UTC from:
 
 https://bikesy.com/api/route?lat1=37.789281229572&lng1=-122.46094205322234&lat2=37.78012650217339&lng2=-122.44433400393197&scenario=5
