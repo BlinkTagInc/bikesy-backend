@@ -138,9 +138,9 @@ Existing limitations remain: bridge hours/closures are static, timezone data is 
 The bootstrap already exists as this immutable private image:
 
 ```
-vcr.vercel.com/blinktag/bikesy-valhalla-preview/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1
+vcr.vercel.com/blinktag/bikesy-backend/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1
 ```
 
 It holds the patched amd64 engine, 46 graph tiles, six HGT rasters, admin DB, policy/stair indexes and config. Docker pulls those image layers during the build. Git contains only code, fixture snippets and hashes. The image digest pins the artifact; `graph/deployed-runtime.lock.json` binds individual files. Keep this base through deployment cleanups. Deleting its deployment-associated image can break future builds even if an already-built deployment still runs. A later separately named `routing-data` repository can hold releases independently; creating/pushing it is a separate approved maintenance operation.
 
-The registry is project-private; the digest is an identifier, not a credential. For a new developer machine, use authorized `vercel link --scope blinktag --project bikesy-valhalla-preview`, then `vercel vcr login docker`, which creates a short-lived project credential. These setup commands were not run during packaging. Never commit `.vercel`, `.env`, Docker credentials or signed transfer URLs. Another Vercel project needs separately authorized access or its own copied data image.
+The registry is project-private; the digest is an identifier, not a credential. For a new developer machine, use authorized `vercel link --scope blinktag --project bikesy-backend`, then `vercel vcr login docker`, which creates a short-lived project credential. These setup commands were not run during packaging. Never commit `.vercel`, `.env`, Docker credentials or signed transfer URLs. Another Vercel project needs separately authorized access or its own copied data image.

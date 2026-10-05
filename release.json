@@ -1,8 +1,8 @@
 {
   "release": "bikesy-graph-stairs-2026-10-05",
   "deployment": "dpl_BtTTmSJySvMUJhDidyCTdtwMMph6",
-  "verified_url": "https://bikesy-valhalla-preview-4r2gr9l6e-blinktag.vercel.app/stage",
-  "runtime_image": "vcr.vercel.com/blinktag/bikesy-valhalla-preview/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1",
+  "verified_url": "https://bikesy-backend-4r2gr9l6e-blinktag.vercel.app/stage",
+  "runtime_image": "vcr.vercel.com/blinktag/bikesy-backend/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1",
   "image_bytes": 642651541,
   "engine_sha256": "82c32a1218531ac87de394699791212e32989147f3c17b705140cbac35fa755d",
   "runtime_files": {

@@ -1,6 +1,6 @@
 {
   "verifiedAt": "2026-10-04T15:46:11.694299+00:00",
-  "url": "https://bikesy-valhalla-preview-4r2gr9l6e-blinktag.vercel.app/stage",
+  "url": "https://bikesy-backend-4r2gr9l6e-blinktag.vercel.app/stage",
   "deploymentId": "dpl_BtTTmSJySvMUJhDidyCTdtwMMph6",
   "engineSha256": "82c32a1218531ac87de394699791212e32989147f3c17b705140cbac35fa755d",
   "runtimeVerifiedDataFiles": 56,
@@ -19,12 +19,7 @@
     "presets": 16,
     "compatibilityChecks": 9,
     "protectionChecksAfterRevocation": 6,
-    "mobileWidths": [
-      320,
-      390,
-      760,
-      1280
-    ]
+    "mobileWidths": [320, 390, 760, 1280]
   },
   "caveats": [
     "Static bridge/path availability; schedules and closures are not enforced by current timezone data.",
