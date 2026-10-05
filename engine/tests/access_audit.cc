@@ -1,0 +1,5 @@
+#include "config.h"
+#include "baldr/graphreader.h"
+#include <iostream>
+#include <set>
+int main(int argc,char**argv){using namespace valhalla::baldr;GraphReader r(valhalla::config(argv[1]).get_child("mjolnir"));std::set<uint64_t> selected={22272045,206914597,25966237,746840097,368033990,970229713,1267474226,1560010153,368049578,1560010154,51999978,969662680,174872890,179235629,969661809,10514431,212238611,42248740,156047241,26972072,42127704,184877571,184877572,1000067342};std::cout<<"graph_id,way_id,forward,bicycle_forward,bicycle_reverse,road_class,use,length_m\n";for(auto id:r.GetTileSet()){auto t=r.GetGraphTile(id);for(uint32_t i=0;i<t->header()->directededgecount();++i){auto e=t->directededge(i);if(e->is_shortcut())continue;auto w=t->edgeinfo(e).wayid();bool bike=e->forwardaccess()&kBicycleAccess;if(!selected.count(w)&&!(e->classification()==RoadClass::kMotorway&&bike))continue;std::cout<<GraphId(id.tileid(),id.level(),i).value<<','<<w<<','<<e->forward()<<','<<bike<<','<<bool(e->reverseaccess()&kBicycleAccess)<<','<<int(e->classification())<<','<<int(e->use())<<','<<e->length()<<'\n';}}}

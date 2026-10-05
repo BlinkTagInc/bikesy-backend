@@ -1,0 +1,5 @@
+#include "config.h"
+#include "baldr/graphreader.h"
+#include <iostream>
+#include <iomanip>
+int main(int argc,char**argv){using namespace valhalla::baldr;GraphReader r(valhalla::config(argv[1]).get_child("mjolnir"));for(auto id:r.GetTileSet()){auto t=r.GetGraphTile(id);for(uint32_t i=0;i<t->header()->directededgecount();++i){auto e=t->directededge(i);if(e->use()!=Use::kFerry&&e->use()!=Use::kRailFerry)continue;auto info=t->edgeinfo(e);auto shape=info.shape();if(!e->forward())std::reverse(shape.begin(),shape.end());std::cout<<"{\"edge\":"<<GraphId(id.tileid(),id.level(),i).value<<",\"way\":"<<info.wayid()<<",\"endnode\":"<<e->endnode().value<<",\"bike\":"<<bool(e->forwardaccess()&kBicycleAccess)<<",\"reverse_bike\":"<<bool(e->reverseaccess()&kBicycleAccess)<<",\"length\":"<<e->length()<<",\"names\":[";bool comma=false;for(auto name:info.GetNames()){if(comma)std::cout<<',';comma=true;std::cout<<std::quoted(name);}std::cout<<"],\"shape\":[";comma=false;for(auto ll:shape){if(comma)std::cout<<',';comma=true;std::cout<<std::setprecision(9)<<'['<<ll.lat()<<','<<ll.lng()<<']';}std::cout<<"]}\n";}}}

@@ -1,0 +1,51 @@
+{
+  "commit": "d377c8ace9ea88dfa989466258bf738b1080f22a",
+  "runtime_digest": "sha256:f58558b2164ec7fa6f6ee9199cea06e18ac8217da24e7faa7718ea526a88ac1a",
+  "files": [
+    {
+      "path": "src/sif/bicyclecost.cc",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/src/sif/bicyclecost.cc",
+      "sha256": "b437a1532c1b11047644f81da00a3e740f823315bd5beb1900e54421822510b7"
+    },
+    {
+      "path": "src/thor/route_action.cc",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/src/thor/route_action.cc",
+      "sha256": "59dc9986e3666ee5b7c42d72f6c6e6875a8a298bb67d36cd2d50c0173a6ad1bc"
+    },
+    {
+      "path": "src/valhalla_service.cc",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/src/valhalla_service.cc",
+      "sha256": "3f4454e162a915f5ea51a0a76dd674d5b3688a1ddca8a14610ecc0ca5332b5b8"
+    },
+    {
+      "path": "src/baldr/edgeinfo.cc",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/src/baldr/edgeinfo.cc",
+      "sha256": "62817c55ea8d2a44233effe83c36bc770fd8eb761ecd3cfd59fbf709657b1ed5"
+    },
+    {
+      "path": "src/skadi/util.cc",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/src/skadi/util.cc",
+      "sha256": "8442fc017b4393c872bf379cd2d236f3298581475509d1b0cc4121fd26be4f59"
+    },
+    {
+      "path": "valhalla/skadi/util.h",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/valhalla/skadi/util.h",
+      "sha256": "8f490e654869bf262a18037575ab759b869c769b0efe75ee1d21821f50a59a61"
+    },
+    {
+      "path": "valhalla/baldr/graphreader.h",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/valhalla/baldr/graphreader.h",
+      "sha256": "4bbe352f611867de5fcfd4bcf789b4535b0fb7742de41d18decf025f13b7c0d7"
+    },
+    {
+      "path": "valhalla/baldr/nodeinfo.h",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/valhalla/baldr/nodeinfo.h",
+      "sha256": "7696c9db9dd8ee105c7f288ba5396fe45df7e95aafb337b6431ee0d9deb30118"
+    },
+    {
+      "path": "valhalla/baldr/graphtile.h",
+      "url": "https://raw.githubusercontent.com/valhalla/valhalla/d377c8ace9ea88dfa989466258bf738b1080f22a/valhalla/baldr/graphtile.h",
+      "sha256": "fa41b31536a3d99ae1db082b03af845225f8700f2d620c53010203c11d6f2aa6"
+    }
+  ]
+}

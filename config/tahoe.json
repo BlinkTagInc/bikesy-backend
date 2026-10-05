@@ -1,0 +1,18 @@
+{
+  "bounds": {
+    "left": -120.345042,
+    "bottom": 38.750276,
+    "right": -119.659482,
+    "top": 39.368232
+  },
+  "scenarios": {
+    "1": {
+      "use_hills": 0.5,
+      "use_roads": 0
+    },
+    "2": {
+      "use_hills": 0.5,
+      "use_roads": 1
+    }
+  }
+}

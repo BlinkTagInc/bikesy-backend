@@ -1,0 +1,14 @@
+**
+!package.json
+!serve.mjs
+!stage.html
+!release.json
+!src
+!src/**
+!config
+!config/**
+!graph
+!graph/deployed-runtime.lock.json
+!scripts
+!scripts/verify-release.mjs
+!Dockerfile.vercel

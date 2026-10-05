@@ -1,0 +1,6 @@
+No license for original Bikesy project code is granted by this source package.
+The project owner should choose a license before offering that code for public reuse.
+
+Third-party components retain their own licenses. See THIRD_PARTY_NOTICES.md,
+LICENSES/, scripts/vendor/valhalla-COPYING, and test/vendor/.
+OpenStreetMap-derived fixtures and routing databases are subject to ODbL 1.0.

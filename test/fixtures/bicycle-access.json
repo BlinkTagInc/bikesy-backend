@@ -1,0 +1,235 @@
+[
+  {
+    "name": "Page-style designated exception",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated"
+    },
+    "normalize": true
+  },
+  {
+    "name": "Explicit bicycle yes exception",
+    "tags": {
+      "access": "destination",
+      "bicycle": "yes"
+    },
+    "normalize": true
+  },
+  {
+    "name": "Motor-only destination remains bicycle exemption",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "motor_vehicle": "destination"
+    },
+    "normalize": true
+  },
+  {
+    "name": "One-way masks unchanged",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "oneway": "yes"
+    },
+    "normalize": true
+  },
+  {
+    "name": "Legal bicycle contraflow unchanged",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "oneway": "yes",
+      "oneway:bicycle": "no"
+    },
+    "normalize": true
+  },
+  {
+    "name": "Do not widen bicycle=destination",
+    "tags": {
+      "access": "destination",
+      "bicycle": "destination"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen bicycle=private",
+    "tags": {
+      "access": "destination",
+      "bicycle": "private"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen bicycle=no",
+    "tags": {
+      "access": "destination",
+      "bicycle": "no"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen bicycle=permissive",
+    "tags": {
+      "access": "destination",
+      "bicycle": "permissive"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen bicycle=dismount",
+    "tags": {
+      "access": "destination",
+      "bicycle": "dismount"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Plain destination-only road",
+    "tags": {
+      "access": "destination"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen access=private",
+    "tags": {
+      "access": "private",
+      "bicycle": "designated"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen access=no",
+    "tags": {
+      "access": "no",
+      "bicycle": "designated"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen access=customers",
+    "tags": {
+      "access": "customers",
+      "bicycle": "designated"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Do not widen access=permit",
+    "tags": {
+      "access": "permit",
+      "bicycle": "designated"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion bicycle:conditional",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "bicycle:conditional": "no @ (Mo-Fr)"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion access:conditional",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "access:conditional": "no @ (night)"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion bicycle:forward",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "bicycle:forward": "no"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion bicycle:backward",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "bicycle:backward": "destination"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion access:forward",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "access:forward": "private"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion vehicle:conditional",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "vehicle:conditional": "no @ (Mo-Fr)"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion oneway:conditional",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "oneway:conditional": "yes @ (Mo-Fr)"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion vehicle",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "vehicle": "private"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion motor_vehicle",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "motor_vehicle": "private"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion motorcar",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "motorcar": "customers"
+    },
+    "normalize": false
+  },
+  {
+    "name": "Conservative exclusion barrier",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "barrier": "gate"
+    },
+    "normalize": false
+  },
+  {
+    "name": "School speed condition does not restrict bicycle access",
+    "tags": {
+      "access": "destination",
+      "bicycle": "designated",
+      "motor_vehicle": "destination",
+      "maxspeed:conditional": "15 mph @ school",
+      "source:maxspeed:conditional": "sign"
+    },
+    "normalize": true
+  }
+]

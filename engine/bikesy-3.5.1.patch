@@ -1,0 +1,147 @@
+--- a/bicyclecost.cc
++++ b/bicyclecost.cc
+@@ -1,4 +1,6 @@
++#include "stair_policy.h"
+ #include "sif/bicyclecost.h"
++#include "bikesy_policy.h"
+ #include "baldr/accessrestriction.h"
+ #include "baldr/directededge.h"
+ #include "baldr/graphconstants.h"
+@@ -359,7 +361,7 @@
+    */
+   virtual float AStarCostFactor() const override {
+     // Assume max speed of 2 * the average speed set for costing
+-    return speedfactor_[static_cast<uint32_t>(2 * speed_)];
++    return 0.0f; // Dijkstra lower bound stays admissible despite rounded edge lengths.
+   }
+ 
+   /**
+@@ -410,6 +412,8 @@
+   // Elevation/grade penalty (weighting applied based on the edge's weighted
+   // grade (relative value from 0-15)
+   float grade_penalty[16];
++  bool exclude_ferries_;
++  float uphill_weight_;
+ 
+ protected:
+   /**
+@@ -422,7 +426,7 @@
+   bool Allowed(const baldr::DirectedEdge* edge,
+                const graph_tile_ptr& tile,
+                uint16_t disallow_mask = kDisallowNone) const override {
+-    return DynamicCost::Allowed(edge, tile, disallow_mask) && !edge->bss_connection() &&
++    return !(exclude_ferries_ && (edge->use() == Use::kFerry || edge->use() == Use::kRailFerry)) && DynamicCost::Allowed(edge, tile, disallow_mask) && !edge->bss_connection() &&
+            edge->use() != Use::kSteps &&
+            (avoid_bad_surfaces_ != 1.0f || edge->surface() <= worst_allowed_surface_);
+   }
+@@ -524,6 +528,9 @@
+ 
+   // Populate the grade penalties (based on use_hills factor - value between 0 and 1)
+   float use_hills = costing_options.use_hills();
++  exclude_ferries_ = costing_options.use_ferry() == 0.0f;
++  uphill_weight_ = 4.0f * (1.0f - use_hills);
++  shortest_ = shortest_ || (use_roads_ == 1.0f && use_hills == 1.0f);
+   float avoid_hills = (1.0f - use_hills);
+   for (uint32_t i = 0; i <= kMaxGradeFactor; i++) {
+     grade_penalty[i] = avoid_hills * kAvoidHillsStrength[i];
+@@ -542,7 +549,8 @@
+   // Check bicycle access and turn restrictions. Bicycles should obey
+   // vehicular turn restrictions. Allow Uturns at dead ends only.
+   // Skip impassable edges and shortcut edges.
+-  if (!IsAccessible(edge) || edge->is_shortcut() ||
++  if ((exclude_ferries_ && (edge->use() == Use::kFerry || edge->use() == Use::kRailFerry)) ||
++      !IsAccessible(edge) || edge->is_shortcut() ||
+       (!pred.deadend() && pred.opp_local_idx() == edge->localedgeidx() &&
+        pred.mode() == TravelMode::kBicycle) ||
+       (!ignore_turn_restrictions_ && (pred.restrictions() & (1 << edge->localedgeidx()))) ||
+@@ -577,7 +585,8 @@
+                                  uint8_t& restriction_idx) const {
+   // Check access, U-turn (allow at dead-ends), and simple turn restriction.
+   // Do not allow transit connection edges.
+-  if (!IsAccessible(opp_edge) || opp_edge->is_shortcut() ||
++  if ((exclude_ferries_ && (opp_edge->use() == Use::kFerry || opp_edge->use() == Use::kRailFerry)) ||
++      !IsAccessible(opp_edge) || opp_edge->is_shortcut() ||
+       opp_edge->use() == Use::kTransitConnection || opp_edge->use() == Use::kEgressConnection ||
+       opp_edge->use() == Use::kPlatformConnection ||
+       (!pred.deadend() && pred.opp_local_idx() == edge->localedgeidx() &&
+@@ -598,13 +607,14 @@
+ // Returns the cost to traverse the edge and an estimate of the actual time
+ // (in seconds) to traverse the edge.
+ Cost BicycleCost::EdgeCost(const baldr::DirectedEdge* edge,
+-                           const graph_tile_ptr&,
++                           const graph_tile_ptr& tile,
+                            const baldr::TimeInfo&,
+                            uint8_t&) const {
+   // Stairs/steps - high cost (travel speed = 1kph) so they are generally avoided.
+   if (edge->use() == Use::kSteps) {
+     float sec = (edge->length() * speedfactor_[1]);
+-    return {shortest_ ? edge->length() : sec * kBicycleStepsFactor, sec};
++    // Carrying penalty applies even to Direct/Ignore: shortest rideable effort, not pure meters.
++    return {edge->length() + bikesy::stairs().penalty(edge, tile) + uphill_weight_ * bikesy::policy().uphill(edge, tile), sec};
+   }
+ 
+   // Ferries are a special case - they use the ferry speed (stored on the edge)
+@@ -612,7 +622,7 @@
+     // Compute elapsed time based on speed. Modulate cost with weighting factors.
+     assert(edge->speed() < speedfactor_.size());
+     float sec = (edge->length() * speedfactor_[edge->speed()]);
+-    return {shortest_ ? edge->length() : sec * ferry_factor_, sec};
++    return {static_cast<float>(edge->length()), sec};
+   }
+ 
+   // Represents how stressful a roadway is without looking at grade or cycle accommodations
+@@ -671,7 +681,7 @@
+   // Create an edge factor based on total stress (sum of accommodation factor and roadway
+   // stress) and the weighted grade penalty for the edge.
+   float factor =
+-      1.0f + grade_penalty[edge->weighted_grade()] + (accommodation_factor * roadway_stress);
++      1.0f + avoid_roads_ * (accommodation_factor * roadway_stress);
+ 
+   // If surface is worse than the minimum we add a surface factor
+   if (edge->surface() >= minimal_surface_penalized_) {
+@@ -693,7 +703,7 @@
+ 
+   // Compute elapsed time based on speed. Modulate cost with weighting factors.
+   float sec = (edge->length() * speedfactor_[bike_speed]);
+-  return {shortest_ ? edge->length() : sec * factor, sec};
++  return {shortest_ ? edge->length() : edge->length() * factor + uphill_weight_ * bikesy::policy().uphill(edge, tile), sec};
+ }
+ 
+ // Returns the time (in seconds) to make the transition from the predecessor
+@@ -759,6 +769,7 @@
+   // Return cost (time and penalty)
+   c.cost += shortest_ ? 0 : seconds * (turn_stress + 1.0f) + penalty;
+   c.secs += seconds;
++  c.cost *= 5.0f; // Convert independent transition seconds to meter-equivalent cost.
+   return c;
+ }
+ 
+@@ -835,6 +846,7 @@
+   // Return cost (time and penalty)
+   c.cost += shortest_ ? 0.f : seconds * (turn_stress + 1.0f) + penalty;
+   c.secs += seconds;
++  c.cost *= 5.0f; // Convert independent transition seconds to meter-equivalent cost.
+   return c;
+ }
+ 
+--- a/route_action.cc
++++ b/route_action.cc
+@@ -1,4 +1,5 @@
+ #include "thor/worker.h"
++#include "bikesy_policy.h"
+ #include <cstdint>
+ 
+ #include "baldr/attributes_controller.h"
+@@ -348,6 +349,12 @@
+     }
+   }
+ 
++  if (paths.empty() && costing == "bicycle" &&
++      options.costings().at(Costing::bicycle).options().use_ferry() == 0.0f &&
++      bikesy::policy().disconnected(origin, destination, *reader)) {
++    throw valhalla_exception_t{470, "Bikesy certified land disconnection", 400,
++                              "Bad Request", "NoRoute", "bikesy_land_disconnected"};
++  }
+   return paths;
+ }
+ 

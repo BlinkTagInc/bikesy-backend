@@ -1,0 +1,16 @@
+# Routing data and the patched engine are already stored in this private VCR image.
+# Retain it: deleting the base image breaks future builds. See docs/DEPLOY.md.
+ARG BIKESY_RUNTIME_IMAGE=vcr.vercel.com/blinktag/bikesy-valhalla-preview/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1
+FROM ${BIKESY_RUNTIME_IMAGE}
+USER root
+WORKDIR /app
+COPY package.json serve.mjs stage.html release.json ./
+COPY src ./src
+COPY config ./config
+COPY graph/deployed-runtime.lock.json ./graph/deployed-runtime.lock.json
+COPY scripts/verify-release.mjs ./scripts/verify-release.mjs
+RUN rm -f /app/preview-manifest.json && chmod -R a+rX /app && node scripts/verify-release.mjs --image
+USER 65534:65534
+ENV PORT=80 BIKESY_CONFIG=/app/config/sample.json MAX_CONCURRENT_ROUTES=2
+EXPOSE 80
+ENTRYPOINT ["node", "/app/serve.mjs"]

@@ -1,0 +1,1 @@
+The unmodified @mapbox/polyline 1.1.1 src/polyline.js is vendored as .cjs for the mobile compatibility regression only. Its BSD license is preserved in mapbox-polyline-LICENSE. Downloaded from the exact registry URL and SHA-512 integrity pinned in bikesy-native commit 6d10183f4a5f38ac6846fa0fd2c730f68dea02b4 yarn.lock. No new runtime dependency.
