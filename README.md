@@ -52,11 +52,11 @@ For a deployed backend, replace `BASE_URL` with its actual HTTPS origin, without
 
 The active Bay Area configuration maps all nine scenarios as follows:
 
-| Facility preference | Flatter (`use_hills=0`) | Balanced hills (`0.75`) | More hill-tolerant (`1`) |
-| --- | --- | --- | --- |
-| Direct (`use_roads=1`) | 1 | 2 | 3 |
-| Balanced (`use_roads=0.5`) | 4 | 5 | 6 |
-| Bike facilities (`use_roads=0`) | 7 | 8 | 9 |
+| Facility preference             | Flatter (`use_hills=0`) | Balanced hills (`0.75`) | More hill-tolerant (`1`) |
+| ------------------------------- | ----------------------- | ----------------------- | ------------------------ |
+| Direct (`use_roads=1`)          | 1                       | 2                       | 3                        |
+| Balanced (`use_roads=0.5`)      | 4                       | 5                       | 6                        |
+| Bike facilities (`use_roads=0`) | 7                       | 8                       | 9                        |
 
 These are preferences, not guarantees about distance or elevation. Scenario 9 retains the engine's default maneuver penalty; the others use 2.
 
@@ -75,19 +75,23 @@ HTTP **200** returns the legacy-compatible JSON shape below. This saved example 
     "B??@????????@???????????????????????????@????@?@@@???@@?@??@@@B"
   ],
   "total_distance": 5278,
-  "elevation_profile": [[0, 80.61], [18, 80.04], [36, 79.62]]
+  "elevation_profile": [
+    [0, 80.61],
+    [18, 80.04],
+    [36, 79.62]
+  ]
 }
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `directions` | Rows of `[turn, street_name, [longitude, latitude]]`. There is no separate arrival row. |
-| `path` | `[encoded_polyline, encoded_levels]`. Decode the first string with precision **5** (`1e-5` degrees); decoded points are `[latitude, longitude]`. The second string contains legacy simplification levels. The API does not expose the engine's internal precision-6 shape. |
-| `total_distance` | Route length in **meters**. |
-| `elevation_profile` | `[distance_along_route_meters, elevation_meters]` samples. Heights are DEM estimates, and sampled shape length may differ slightly from `total_distance`. |
-| `stats.route_find_time` | Seconds spent in the upstream route phase, including a permitted ferry retry. |
-| `stats.route_desc_time` | Seconds spent converting the route and obtaining/validating elevation. |
-| `stats.endpoint_find_time` | Always `0`; endpoint snapping is included in the route phase. |
+| Field                      | Meaning                                                                                                                                                                                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `directions`               | Rows of `[turn, street_name, [longitude, latitude]]`. There is no separate arrival row.                                                                                                                                                                                    |
+| `path`                     | `[encoded_polyline, encoded_levels]`. Decode the first string with precision **5** (`1e-5` degrees); decoded points are `[latitude, longitude]`. The second string contains legacy simplification levels. The API does not expose the engine's internal precision-6 shape. |
+| `total_distance`           | Route length in **meters**.                                                                                                                                                                                                                                                |
+| `elevation_profile`        | `[distance_along_route_meters, elevation_meters]` samples. Heights are DEM estimates, and sampled shape length may differ slightly from `total_distance`.                                                                                                                  |
+| `stats.route_find_time`    | Seconds spent in the upstream route phase, including a permitted ferry retry.                                                                                                                                                                                              |
+| `stats.route_desc_time`    | Seconds spent converting the route and obtaining/validating elevation.                                                                                                                                                                                                     |
+| `stats.endpoint_find_time` | Always `0`; endpoint snapping is included in the route phase.                                                                                                                                                                                                              |
 
 The `stats` values measure API processing, **not estimated cycling duration**. Queue wait is excluded from these timings but counts toward the request deadline. Optional `route_warnings` appears for walking sections, for example `[{"code":"walk_bicycle","message":"Walking sections may include stairs; dismount or carry your bicycle where required."}]`; it does not supply a stair count.
 
@@ -104,19 +108,19 @@ curl -i "$BASE_URL/api/route"
 HTTP **200**:
 
 ```json
-{"error":"No `lat1` specified"}
+{ "error": "No `lat1` specified" }
 ```
 
 Passing `scenario=10` with all four valid coordinates also returns HTTP **200**:
 
 ```json
-{"error":"Invalid `scenario` 10"}
+{ "error": "Invalid `scenario` 10" }
 ```
 
 A backend/upstream failure can return HTTP **502**:
 
 ```json
-{"error":"Routing service unavailable or incomplete elevation data"}
+{ "error": "Routing service unavailable or incomplete elevation data" }
 ```
 
 Other errors use the same envelope: HTTP 200 for `No route found` or `Location outside routing bounds`, 404 for an unknown endpoint, 405 for an unsupported method, 503 when the routing queue is full, and 504 when the deadline expires. An HTTP-200 error contains no success-route fields. See [`src/adapter.js`](src/adapter.js) and [`src/server.js`](src/server.js) for the authoritative status behavior.
@@ -129,4 +133,14 @@ Other errors use the same envelope: HTTP 200 for `No route found` or `Location o
 
 Existing limitations remain: bridge hours/closures are static, timezone data is absent, route-distance ordering and some regional detours/duplicates remain, unknown stair counts use a length fallback, and DEM heights are estimates. Tahoe configuration is retained for contract tests; this data image serves the Bay Area only.
 
-See `LICENSE` and [third-party notices](THIRD_PARTY_NOTICES.md). No new license for original project code was selected on the owner's behalf.
+## Where the data comes from
+
+The bootstrap already exists as this immutable private image:
+
+```
+vcr.vercel.com/blinktag/bikesy-valhalla-preview/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1
+```
+
+It holds the patched amd64 engine, 46 graph tiles, six HGT rasters, admin DB, policy/stair indexes and config. Docker pulls those image layers during the build. Git contains only code, fixture snippets and hashes. The image digest pins the artifact; `graph/deployed-runtime.lock.json` binds individual files. Keep this base through deployment cleanups. Deleting its deployment-associated image can break future builds even if an already-built deployment still runs. A later separately named `routing-data` repository can hold releases independently; creating/pushing it is a separate approved maintenance operation.
+
+The registry is project-private; the digest is an identifier, not a credential. For a new developer machine, use authorized `vercel link --scope blinktag --project bikesy-valhalla-preview`, then `vercel vcr login docker`, which creates a short-lived project credential. These setup commands were not run during packaging. Never commit `.vercel`, `.env`, Docker credentials or signed transfer URLs. Another Vercel project needs separately authorized access or its own copied data image.
