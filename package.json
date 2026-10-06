@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node serve.mjs",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/adapter.js && node --check src/server.js && node --check src/polyline.js && node --check src/config.js && node --check serve.mjs && node --check src/stage-elevation.js",
+    "check": "node --check src/adapter.js && node --check src/server.js && node --check src/polyline.js && node --check src/config.js && node --check serve.mjs && node --check src/stage-elevation.js && node --check src/startup-timing.js",
     "test:data": "python3 -m unittest discover -s test -p \"*_test.py\"",
     "start:adapter": "BIKESY_CONFIG=./config/sample.json node src/server.js",
     "verify:release": "node scripts/verify-release.mjs"

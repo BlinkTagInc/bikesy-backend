@@ -176,3 +176,51 @@ vcr.vercel.com/blinktag/bikesy-backend/dockerfile@sha256:6619a51429b555a865eabbe
 It holds the patched amd64 engine, 46 graph tiles, six HGT rasters, admin DB, policy/stair indexes and config. Docker pulls those image layers during the build. Git contains only code, fixture snippets and hashes. The image digest pins the artifact; `graph/deployed-runtime.lock.json` binds individual files. Keep this base through deployment cleanups. Deleting its deployment-associated image can break future builds even if an already-built deployment still runs. A later separately named `routing-data` repository can hold releases independently; creating/pushing it is a separate approved maintenance operation.
 
 The registry is project-private; the digest is an identifier, not a credential. For a new developer machine, use authorized `vercel link --scope blinktag --project bikesy-backend`, then `vercel vcr login docker`, which creates a short-lived project credential. These setup commands were not run during packaging. Never commit `.vercel`, `.env`, Docker credentials or signed transfer URLs. Another Vercel project needs separately authorized access or its own copied data image.
+
+## Startup timing
+
+Startup retains every data/engine hash check and the existing route plus elevation
+readiness probes. The HTTP server, including `/health`, listens only after those
+checks pass. No graph/DEM download or rebuild happens on this path.
+
+Structured stdout events now share an `instance` UUID:
+
+- `startup_begin`: instrumentation has loaded; `startup_ms` already includes Node
+  initialization and module loading before this event.
+- `startup_phase`: `phase`, `attempt`, `status` (`ok` or `failed`), `duration_ms`,
+  and elapsed `startup_ms`. Retried route/elevation probes produce separate events.
+- `ready`: total `startup_ms`, summed `startup_phases_ms`,
+  `startup_phase_attempts`, and `startup_phase_failures`, plus the existing fields.
+  Existing `milliseconds` keeps its old meaning: elapsed since just before engine
+  spawn, excluding verification. Use `startup_ms` for complete Node startup.
+
+The phases are `data_verification` (manifest and all data hashes),
+`engine_verification` (binary hash), `engine_readiness` (spawn through first valid
+status response, including status polling), `route_probe`, `elevation_probe`, and
+`http_ready` (HTTP setup through the listen callback). Phase totals can be lower
+than overall startup: module loading, gaps and retry sleeps are not assigned to a
+phase. Verification failures still stop startup; failed probe attempts still use
+the existing retry/deadline behavior. A failed startup has no `ready` event.
+
+All timing events carry `timing_scope: "node_process"` and
+`platform_provisioning_included: false`. Time starts at Node's performance time
+origin, not when Vercel received a request. Platform scheduling, image provisioning,
+ingress, and client network time remain outside these metrics. Route response
+`stats` also exclude container startup and queue wait.
+
+After deploying this backend revision, filter runtime logs by `instance` and
+compare `ready.startup_ms` with `startup_phases_ms.data_verification`,
+`engine_verification`, `engine_readiness`, `route_probe`, and `elevation_probe`.
+Correlate with request latency in Vercel to identify time outside the process.
+Repeated container logs may be attached to multiple requests; group by instance
+and phase/attempt before counting starts or retries. `engine_policy_verified`,
+`resource_sample`, and `engine_exit` use the same instance identifier.
+
+The frontend's one-time page-open health warmup is a separate deployment. Both
+repositories must be deployed for both changes to take effect. No keepalive
+schedule, allocation change, or weaker integrity check is part of this change.
+
+`npm test` includes deterministic timing tests and an offline harness that executes
+the actual supervisor with fake files, engine responses and HTTP listener. It
+checks failed verification, probe retries, and that HTTP readiness still follows
+verification and both probes, without starting Valhalla or contacting production.
