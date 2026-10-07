@@ -3,30 +3,28 @@ import { randomUUID, createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { createHandler } from './src/server.js';
-import { loadConfig } from './src/config.js';
+import { loadConfig, resolveConfigPath } from './src/config.js';
+import { verifyStartupData } from './src/verify-startup.js';
 import { createStageElevationHandler } from './src/stage-elevation.js';
 import { createStartupTiming } from './src/startup-timing.js';
 const instance = randomUUID();
 const startup = createStartupTiming({ instance });
 const config = loadConfig();
-if (config.engine_policy === 'bikesy-distance-v1') {
-  const lock = startup.measureSync('data_verification', () => {
-    const lock = JSON.parse(readFileSync('/data/engine-policy.json'));
-    if (lock.policy !== config.engine_policy) throw Error('Engine policy version mismatch');
-    for (const [relative, sha] of Object.entries(lock.files)) {
-      if (!/^(?:tiles|elevation)\/[^.][A-Za-z0-9_/. -]+$|^(?:bikesy-policy\.bin|bikesy-stairs\.txt|admin\.sqlite|valhalla\.json)$/.test(relative) || relative.includes('..')) throw Error('Invalid policy manifest path');
-      if (createHash('sha256').update(readFileSync('/data/' + relative)).digest('hex') !== sha) throw Error('Engine policy dataset mismatch: ' + relative);
-    }
-    return lock;
-  });
-  startup.measureSync('engine_verification', () => {
-    if (createHash('sha256').update(readFileSync('/usr/local/bin/valhalla_service')).digest('hex') !== lock.engine_sha256) throw Error('Engine binary mismatch');
-  });
-  if (lock.stair_policy !== 'counted-stairs-v1') throw Error('Stair policy version mismatch');
-  process.env.BIKESY_POLICY_DATA = '/data/bikesy-policy.bin';
-  process.env.BIKESY_STAIRS_DATA = '/data/bikesy-stairs.txt';
-  console.log(JSON.stringify({event:'engine_policy_verified',instance,policy:lock.policy,graphAccessPolicy:lock.graph_access_policy,engineSha256:lock.engine_sha256,verifiedDataFiles:Object.keys(lock.files).length}));
-}
+const verification = startup.measureSync('data_verification', () => verifyStartupData({
+  configPath: resolveConfigPath(), policy: config.engine_policy,
+  mode: process.env.BIKESY_DATA_VERIFICATION ?? 'light',
+}));
+const { lock } = verification;
+startup.measureSync('engine_verification', () => {
+  if (createHash('sha256').update(readFileSync('/usr/local/bin/valhalla_service')).digest('hex') !== lock.engine_sha256) throw Error('Engine binary mismatch');
+});
+process.env.BIKESY_POLICY_DATA = '/data/bikesy-policy.bin';
+process.env.BIKESY_STAIRS_DATA = '/data/bikesy-stairs.txt';
+console.log(JSON.stringify({ event: 'engine_policy_verified', instance,
+  policy: lock.policy, graphAccessPolicy: lock.graph_access_policy,
+  engineSha256: lock.engine_sha256, verificationMode: verification.mode,
+  checkedDataFiles: verification.checkedDataFiles, hashedDataFiles: verification.hashedDataFiles,
+  dataManifestSha256: verification.dataManifestSha256 }));
 const start = performance.now();
 const finishEngineReadiness = startup.phase('engine_readiness');
 const engine = spawn('valhalla_service', ['/data/valhalla.json', '1'], { stdio: 'inherit' });
@@ -109,7 +107,7 @@ else if (!stopping) {
     server.on('error', e => { finishHttpReady('failed'); console.error(e.message); stop(1); });
     server.listen(port, '0.0.0.0', () => {
       finishHttpReady();
-      console.log(JSON.stringify({ event: 'ready', ...startup.summary(), milliseconds: performance.now() - start, port }));
+      console.log(JSON.stringify({ event: 'ready', ...startup.summary(), data_verification_mode: verification.mode, milliseconds: performance.now() - start, port }));
     });
   }
 }

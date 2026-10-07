@@ -2,7 +2,7 @@
 
 Git-ready source for the corrected regional import and counted-stairs engine deployed on October 4, 2026. It includes the legacy-compatible routing API, nine SF scenarios, queue/cancellation controls, old/new comparison grid, elevation comparison, and 16 geographic/bridge presets. The configured hill weights are unchanged; there is no experimental detour selector.
 
-**Routing data stays in Vercel Container Registry, outside Git.** `Dockerfile.vercel` inherits the exact existing private image by SHA-256 digest, overlays this repository's application, and verifies the engine and 56 data files at image build. Startup verifies them again. Routes and cold starts do not download or rebuild OSM/DEM data.
+**Routing data stays in Vercel Container Registry, outside Git.** `Dockerfile.vercel` inherits the exact existing private image by SHA-256 digest, overlays this repository's application, and verifies the engine and 56 data files at image build. Normal startup checks release identity, configuration, data-file readability and the engine hash; full startup data hashing is available explicitly. Routes and cold starts do not download or rebuild OSM/DEM data.
 
 ## Start here
 
@@ -179,22 +179,50 @@ The registry is project-private; the digest is an identifier, not a credential. 
 
 ## Startup timing
 
-Startup retains every data/engine hash check and the existing route plus elevation
-readiness probes. The HTTP server, including `/health`, listens only after those
-checks pass. No graph/DEM download or rebuild happens on this path.
+Normal startup uses `BIKESY_DATA_VERIFICATION=light` (the default). It verifies:
 
-Structured stdout events now share an `instance` UUID:
+- Both `/data/engine-policy.json` and the application's data lock against the
+  expected manifest digest in `release.json`, including policy and engine identity.
+- The active application configuration against a configuration hash in the release,
+  using the same path resolution as `loadConfig`, and `/data/valhalla.json` against
+  its locked hash. Config overrides must contain a release-approved configuration;
+  changing settings requires updating the source release hashes.
+- Every listed data path is safe, stays within `/data`, and resolves to a nonempty,
+  readable regular file. Required configuration/policy/admin entries must exist.
+- The engine binary's complete SHA-256 hash.
 
-- `startup_begin`: instrumentation has loaded; `startup_ms` already includes Node
-  initialization and module loading before this event.
-- `startup_phase`: `phase`, `attempt`, `status` (`ok` or `failed`), `duration_ms`,
-  and elapsed `startup_ms`. Retried route/elevation probes produce separate events.
+The final application image build still checks **every data-file hash**, the engine,
+application sources and release/configuration bindings after copying the application
+into the image. `scripts/verify-release.mjs --image` is always exhaustive; startup
+mode cannot weaken it. A stale base manifest or mismatched data/configuration fails
+that build.
+
+Light startup relies on those immutable, build-verified image contents. It does
+**not detect same-path runtime corruption or replacement of bulk data contents**
+that remains readable and nonempty. For mutable/local data validation, add
+`-e BIKESY_DATA_VERIFICATION=full` to the local `docker run` command. Full mode
+rehashes every data file in addition to the same identity, path and configuration
+checks; it does not permit arbitrary unbound configuration. Invalid mode values
+fail startup. Neither mode downloads or rebuilds graph/DEM data.
+
+The engine, route and elevation readiness probes are unchanged. The HTTP server,
+including `/health`, listens only after all checks and probes pass.
+
+Successful startup emits one timing summary, `ready`. Timing events share an
+`instance` UUID:
+
 - `ready`: total `startup_ms`, summed `startup_phases_ms`,
   `startup_phase_attempts`, and `startup_phase_failures`, plus the existing fields.
   Existing `milliseconds` keeps its old meaning: elapsed since just before engine
-  spawn, excluding verification. Use `startup_ms` for complete Node startup.
+  spawn, excluding verification. Use `startup_ms` for complete Node startup,
+  including initialization and module loading.
+- `startup_phase`: emitted only for a failed phase attempt, with `phase`,
+  `attempt`, `status: "failed"`, `duration_ms`, and elapsed `startup_ms`.
+  Successful phases and instrumentation initialization do not emit separate logs;
+  all attempts and their durations still contribute to the `ready` summary.
 
-The phases are `data_verification` (manifest and all data hashes),
+The phases are `data_verification` (manifest/config hashes and file checks in light
+mode, plus all data hashes in full mode),
 `engine_verification` (binary hash), `engine_readiness` (spawn through first valid
 status response, including status polling), `route_probe`, `elevation_probe`, and
 `http_ready` (HTTP setup through the listen callback). Phase totals can be lower
@@ -216,11 +244,26 @@ Repeated container logs may be attached to multiple requests; group by instance
 and phase/attempt before counting starts or retries. `engine_policy_verified`,
 `resource_sample`, and `engine_exit` use the same instance identifier.
 
+`ready.data_verification_mode` identifies `light` or `full`.
+`engine_policy_verified` reports `verificationMode`, `dataManifestSha256`,
+`checkedDataFiles` and `hashedDataFiles` instead of the ambiguous `verifiedDataFiles`.
+For the current 56-file release, light mode checks all 56 data files but hashes
+only the data configuration (`hashedDataFiles: 1`); manifest, application config
+and engine hashes are additional checks outside that count.
+
+Compare overall startup and the first real route, not just the verification phase.
+Removing eager data reads also removes their page-cache warming, so some I/O may
+move into readiness or the first route. The observed production verification time
+is an upper bound on removable work, not a guaranteed net saving. Tests use small
+local fixtures; they are not cold-cloud performance measurements.
+
 The frontend's one-time page-open health warmup is a separate deployment. Both
 repositories must be deployed for both changes to take effect. No keepalive
-schedule, allocation change, or weaker integrity check is part of this change.
+schedule or allocation change is part of this change. The startup integrity
+boundary is described above; exhaustive final-image verification is retained.
 
 `npm test` includes deterministic timing tests and an offline harness that executes
 the actual supervisor with fake files, engine responses and HTTP listener. It
-checks failed verification, probe retries, and that HTTP readiness still follows
+checks the single success summary, retained phase failure logs, failed verification,
+probe retries, and that HTTP readiness still follows
 verification and both probes, without starting Valhalla or contacting production.

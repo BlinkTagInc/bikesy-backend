@@ -43,6 +43,21 @@ The rebuild compiles engine/helpers; verifies 27 access and 13 facility Lua fixt
 
 The source release was compiled and route-tested; a full graph rebuild was not repeated during packaging. The unchanged construction logic was previously reproduced in the isolated experiment. Newly added receipt/package steps need a fresh build receipt for a future data release. Preserve every failed gate; never bypass assertions by substituting old graph IDs or widening access.
 
+## Startup verification after packaging
+
+The final application image's `Dockerfile.vercel` runs exhaustive
+`scripts/verify-release.mjs --image` after copying application files. It binds the
+source lock, base-image manifest, every data file (including `valhalla.json`),
+engine and application configuration to `release.json`. Normal immutable-image
+startup uses lighter manifest/configuration hashes plus safe-path, regular-file
+and readability checks, while retaining the full engine hash and readiness probes.
+
+Use `BIKESY_DATA_VERIFICATION=full` when validating mutable local datasets. Both
+modes require a matching release manifest and approved active configuration.
+Light mode cannot detect same-path bulk-data content corruption after the image
+was verified. See [startup timing and integrity checks](../README.md#startup-timing)
+for mode selection, log fields and performance-measurement limits.
+
 ## Publish a future data release
 
 After validating the candidate's route/bridge/stair cases, publish it under a new versioned tag in a private `routing-data` repository in the same Vercel project. This is a deliberate later upload/storage operation; it was not performed here. Use an authorized VCR login, `docker tag`, and `docker push`; record the resulting **manifest digest**, not the local image ID or a mutable tag.

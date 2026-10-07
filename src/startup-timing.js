@@ -10,7 +10,6 @@ export function createStartupTiming({
   const failures = {};
   const elapsed = () => now();
   const context = { instance, timing_scope: 'node_process', platform_provisioning_included: false };
-  log({ event: 'startup_begin', ...context, startup_ms: elapsed() });
 
   function phase(name) {
     const start = now();
@@ -22,9 +21,11 @@ export function createStartupTiming({
       const end = now();
       const duration = end - start;
       phases[name] = (phases[name] || 0) + duration;
-      if (status !== 'ok') failures[name] = (failures[name] || 0) + 1;
-      log({ event: 'startup_phase', ...context, phase: name, attempt, status,
-        duration_ms: duration, startup_ms: end });
+      if (status !== 'ok') {
+        failures[name] = (failures[name] || 0) + 1;
+        log({ event: 'startup_phase', ...context, phase: name, attempt, status,
+          duration_ms: duration, startup_ms: end });
+      }
     };
   }
   function measureSync(name, action) {

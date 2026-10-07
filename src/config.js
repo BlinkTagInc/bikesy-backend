@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
-export function loadConfig(env = process.env) {
+export function resolveConfigPath(env = process.env) {
   const region = env.BIKESY_REGION || 'sf';
   if (!['sf', 'tahoe'].includes(region)) throw new Error('BIKESY_REGION must be sf or tahoe');
-  const config = JSON.parse(readFileSync(env.BIKESY_CONFIG || new URL(`../config/${region}.json`, import.meta.url)));
+  return env.BIKESY_CONFIG || new URL(`../config/${region}.json`, import.meta.url);
+}
+export function loadConfig(env = process.env) {
+  const config = JSON.parse(readFileSync(resolveConfigPath(env)));
   if (config.engine_policy && config.engine_policy !== 'bikesy-distance-v1') throw new Error('Invalid engine policy');
   const b = config.bounds;
   if (!b || !['left', 'bottom', 'right', 'top'].every(k => Number.isFinite(b[k])) ||
