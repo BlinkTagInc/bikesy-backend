@@ -4,7 +4,8 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { loadConfig, resolveConfigPath, readinessRequest, deriveBounds } from '../src/config.js';
+import { loadConfig, resolveConfigPath, readinessRequest, deriveBounds, listRegionConfigs, validateRegionConfig } from '../src/config.js';
+import { checkRegion, demTiles } from '../scripts/check-region.mjs';
 import { parseQuery } from '../src/adapter.js';
 import { verifyStartupData } from '../src/verify-startup.js';
 
@@ -27,11 +28,11 @@ test('explicit US region config supports a new slug while rejecting unsafe ident
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('SF remains default; explicit config takes precedence; each region probes a valid scenario', () => {
+test('SF remains default; explicit config takes precedence; every region config probes a valid scenario', () => {
   assert.equal(loadConfig({}).region, 'sf');
   assert.match(String(resolveConfigPath({ BIKESY_CONFIG: 'config/tahoe.json' })), /tahoe.json$/);
   assert.match(String(resolveConfigPath({ BIKESY_CONFIG: 'custom.json' })), /custom.json$/);
-  for (const region of ['sf', 'tahoe']) {
+  for (const { region } of listRegionConfigs()) {
     const config = loadConfig({ BIKESY_CONFIG: `config/${region}.json` });
     const probe = readinessRequest(config);
     const [a, b] = probe.locations;
@@ -129,4 +130,71 @@ test('local env file selects Tahoe and an existing environment config takes prec
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('region discovery lists config/REGION.json files and skips engine settings', () => {
+  const regions = listRegionConfigs().map(({ region }) => region);
+  assert.ok(regions.includes('sf') && regions.includes('tahoe'));
+  assert.ok(!regions.some(region => region.startsWith('valhalla')));
+  const root = mkdtempSync(join(tmpdir(), 'bikesy-discovery-'));
+  try {
+    writeFileSync(join(root, 'valhalla-build.json'), '{}');
+    writeFileSync(join(root, 'reno.json'), JSON.stringify({ region: 'reno' }));
+    assert.deepEqual(listRegionConfigs(root).map(({ region }) => region), ['reno']);
+    writeFileSync(join(root, 'carson.json'), JSON.stringify({ region: 'reno' }));
+    assert.throws(() => listRegionConfigs(root), /carson\.json: region "reno" must match the file name/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('every region config passes the region checker and is locked in release.json', () => {
+  for (const entry of listRegionConfigs()) {
+    const report = checkRegion(entry);
+    assert.deepEqual(report.errors, [], entry.region);
+    assert.ok(!report.warnings.some(warning => /lock-source/.test(warning)), `${entry.region}: run node scripts/lock-source.mjs`);
+    assert.ok(report.dem_tiles.length > 0);
+  }
+});
+
+test('region checker rejects smoke trips outside the service area', () => {
+  const [sf] = listRegionConfigs().filter(({ region }) => region === 'sf');
+  const root = mkdtempSync(join(tmpdir(), 'bikesy-check-'));
+  try {
+    mkdirSync(join(root, 'test/fixtures'), { recursive: true });
+    writeFileSync(join(root, 'release.json'), '{}');
+    writeFileSync(join(root, 'test/fixtures/smoke-regions.json'), JSON.stringify({
+      sf: [{ name: 'Tahoe', locations: [{ lat: 39.1667, lon: -120.1439 }, { lat: 39.1725, lon: -120.1385 }] }],
+    }));
+    const report = checkRegion(sf, root);
+    assert.match(report.errors.join(), /Smoke trip "Tahoe"/);
+    assert.match(report.warnings.join(), /--review/);
+    assert.match(report.warnings.join(), /lock-source/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('config validation names the offending key and file', () => {
+  const base = JSON.parse(readFileSync(new URL('../config/tahoe.json', import.meta.url)));
+  assert.equal(validateRegionConfig(base).region, 'tahoe');
+  const cases = [
+    [{ ...base, bound_inset: 0.1 }, /Unknown config key\(s\) bound_inset/],
+    [{ ...base, engine_policy: undefined }, /engine_policy/],
+    [{ ...base, bounds: { ...base.bounds, left: base.bounds.right } }, /Invalid configured bounds/],
+    [{ ...base, scenarios: { ...base.scenarios, flat: base.scenarios['1'] } }, /Invalid scenario flat/],
+    [{ ...base, scenarios: { ...base.scenarios, 2: { use_hills: 2, use_roads: 0 } } }, /Invalid use_hills in scenario 2/],
+    [{ ...base, scenarios: { ...base.scenarios, 2: { use_hills: 0, use_roads: 0, maneuver_penalty: -1 } } }, /maneuver_penalty in scenario 2/],
+    [{ ...base, readiness: { ...base.readiness, scenario: '3' } }, /Readiness scenario/],
+  ];
+  for (const [config, message] of cases) assert.throws(() => validateRegionConfig(JSON.parse(JSON.stringify(config))), message);
+  const root = mkdtempSync(join(tmpdir(), 'bikesy-invalid-'));
+  try {
+    const file = join(root, 'broken.json');
+    writeFileSync(file, JSON.stringify({ ...base, admin_states: ['ON'] }));
+    assert.throws(() => loadConfig({ BIKESY_CONFIG: file }), error => error.message.startsWith(file) && /admin_states/.test(error.message));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('DEM tile names cover the build bounds in every hemisphere', () => {
+  assert.deepEqual(demTiles({ left: -120.5, bottom: 38.65, right: -119.55, top: 39.5 }),
+    ['elevation/N38/N38W121.hgt', 'elevation/N38/N38W120.hgt', 'elevation/N39/N39W121.hgt', 'elevation/N39/N39W120.hgt']);
+  assert.deepEqual(demTiles({ left: 7.2, bottom: -0.5, right: 7.4, top: 0.2 }),
+    ['elevation/S01/S01E007.hgt', 'elevation/N00/N00E007.hgt']);
 });

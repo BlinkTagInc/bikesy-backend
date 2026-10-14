@@ -1,12 +1,18 @@
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { listRegionConfigs, validateRegionConfig } from '../src/config.js';
 const root = new URL('../', import.meta.url);
 const path = new URL('release.json', root);
 const release = JSON.parse(readFileSync(path));
+// Every region config is an approved runtime config; refuse to lock an invalid one.
+const regions = listRegionConfigs(new URL('config/', root));
+for (const { path: file, config } of regions) {
+  try { validateRegionConfig(config); } catch (error) { throw new Error(`${file}: ${error.message}`); }
+}
 const names = new Set([
   'serve.mjs',
   ...readdirSync(new URL('src/', root)).filter(name => name.endsWith('.js')).map(name => `src/${name}`),
-  'config/sf.json', 'config/tahoe.json',
+  ...regions.map(({ region }) => `config/${region}.json`),
 ]);
 const next = Object.fromEntries([...names].map(name => [name,
   createHash('sha256').update(readFileSync(new URL(name, root))).digest('hex'),

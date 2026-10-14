@@ -9,9 +9,10 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env serve.mjs",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/adapter.js && node --check src/server.js && node --check src/polyline.js && node --check src/config.js && node --check serve.mjs && node --check src/startup-timing.js && node --check src/verify-startup.js && node --check scripts/verify-release.mjs",
+    "check": "node --check src/adapter.js && node --check src/server.js && node --check src/polyline.js && node --check src/config.js && node --check serve.mjs && node --check src/startup-timing.js && node --check src/verify-startup.js && node --check scripts/verify-release.mjs && node --check scripts/check-region.mjs && node --check scripts/lock-source.mjs",
     "test:data": "python3 -m unittest discover -s test -p \"*_test.py\"",
     "start:adapter": "node --env-file-if-exists=.env src/server.js",
-    "verify:release": "node scripts/verify-release.mjs"
+    "verify:release": "node scripts/verify-release.mjs",
+    "check:regions": "node scripts/check-region.mjs"
   }
 }
