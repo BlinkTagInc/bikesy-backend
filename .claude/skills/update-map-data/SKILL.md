@@ -1,11 +1,13 @@
 ---
 name: update-map-data
-description: Refresh a region's routing data from the latest OpenStreetMap snapshot — download extracts, rebuild and validate the Valhalla graph, review access changes, package the runtime, and (with approval) publish and deploy it to Vercel. Use when asked to update or refresh map data or routing data for a region ("update the Tahoe map data", "update the contracosta map data", "pull in the latest OSM for SF"), to set up routing data for a new region, or to release new backend code or roll back a region's deployment ("deploy the latest backend code to Tahoe", "roll back the Tahoe backend").
+description: Refresh a region's routing data from the latest OpenStreetMap snapshot — download extracts, rebuild and validate the Valhalla graph, review access changes, package the runtime, and (with approval) publish and deploy it to Vercel. Use when asked to update or refresh map data or routing data for a region ("update the Tahoe map data", "update the contracosta map data", "pull in the latest OSM for SF"), or to set up routing data for a new region. Code-only releases and rollbacks belong to the release-backend skill.
 ---
 
 # Update map data
 
 Periodic job: rebuild one region's routing data from a fresh OSM snapshot and roll it out.
+Building and publishing the data image happens here; deploying it is handed off to the
+**release-backend** skill, which also handles code-only releases and rollbacks.
 The repo docs and `scripts/build-region.sh --help` are the source of truth for *how* each
 step works. This skill is the ordered runbook, the decisions to bring to the user, and
 lessons learned from previous runs. Don't restate the docs here; link to them and record
@@ -35,20 +37,16 @@ Take the region slug from the request ("update the contracosta map data" → `co
 
 Always pass `--region <slug>` explicitly. The scripts default to `sf`.
 
-## 2. Load deployment settings
+## 2. Load local settings
 
-Deployment settings vary per deployer, so they live in a gitignored local file,
-`.claude/update-map-data.local.json`:
+Per-deployer settings live in the gitignored `.claude/regions.local.json`, which this skill
+shares with release-backend. This skill uses:
 
 ```json
 {
   "data_dir": "~/bikesy-data",
   "regions": {
     "<slug>": {
-      "vercel_scope": "<team slug>",
-      "vercel_project": "<project>",
-      "vercel_region": "sfo1",
-      "domain": "<public hostname>",
       "routing_extracts": ["<geofabrik id>", "..."],
       "notes": "anything deployer-specific worth remembering"
     }
@@ -56,10 +54,12 @@ Deployment settings vary per deployer, so they live in a gitignored local file,
 }
 ```
 
-If the file or the region's entry is missing, ask the user for the values, then write
-them. `routing_extracts` is optional; see step 3. Keep each build's workspace at
-`WORK=<data_dir>/<slug>-<YYYY-MM-DD>/` (the snapshot date). Never put raw data or build
-output in Git.
+The same region entry also holds the deployment keys that release-backend documents
+(`deploy_method`, `vercel_scope`, `vercel_project`, ...). Step 6 needs `vercel_scope` and
+`vercel_project` to publish the data image. If the file or the region's entry is missing,
+ask the user for the values, then write them. `routing_extracts` is optional; see step 3.
+Keep each build's workspace at `WORK=<data_dir>/<slug>-<YYYY-MM-DD>/` (the snapshot date).
+Never put raw data or build output in Git.
 
 ## 3. Environment and inputs
 
@@ -131,75 +131,34 @@ output in Git.
    (`<slug>-review-YYYY-MM-DD`), along with any build or doc fixes on their own branch.
    Never push; the user pushes.
 
-6. **Publish (needs explicit user approval for each step).** Use the region's deployment
-   settings:
+6. **Publish the data image (needs the user's approval).** Push the new runtime as an
+   immutable data image to the region's Vercel project registry:
    ```sh
    vercel whoami                                    # must be an account in <vercel_scope>
    vercel vcr login docker --scope <scope> --project <project>     # valid ~12 h
    IMG=vcr.vercel.com/<scope>/<project>/routing-data
    docker build --platform linux/amd64 -t $IMG:v<N>-<YYMMDD> "$WORK/runtime"
    docker push $IMG:v<N>-<YYMMDD>                   # record the digest
-   .venv/bin/python scripts/prepare-release.py --region <slug> --runtime "$WORK/runtime" \
-     --image $IMG@sha256:<digest> --vercel-region <vercel_region> --output "$WORK/deploy-v<N>"
-   vercel link --yes --cwd "$WORK/deploy-v<N>" --scope <scope> --project <project>
-   vercel deploy --cwd "$WORK/deploy-v<N>" --scope <scope> --prod --skip-domain
    ```
-   - **Verify** the returned URL with `vercel curl`: `/health`, `/bounds`, every smoke trip
-     in every scenario, and an out-of-bounds request. Compare against
-     `$WORK/smoke-region.json`.
-   - **Then ask before** `vercel promote <url>`, which moves the public domain.
-   - **New projects only:** attach the domain with `vercel domains add <domain> <project>`,
-     then have the user add the DNS record that `vercel domains verify <domain>` shows.
+   Then follow the **release-backend** skill for a *data release* with that digest and
+   `$WORK`. It covers the region's deploy method, verification against
+   `$WORK/smoke-region.json`, promotion, and new-domain setup.
 
-7. **Record the run:** append to `<data_dir>/RUNS.md`: date, region, snapshot, runtime
-   `engine-policy.json` sha256, image tag and digest, deployment URL, timings from
-   `$WORK/timings.tsv`, and issues. Add new general findings to the lessons below, and
+7. **Record the run:** add the build details to the release entry release-backend writes
+   in `<data_dir>/RUNS.md`: snapshot, runtime `engine-policy.json` sha256, image tag and
+   digest, review status, timings from `$WORK/timings.tsv`, and issues. Add new general findings to the lessons below, and
    deployer-specific ones to the local settings `notes`.
-
-## 5. Code-only release and rollback
-
-Deploys are made with the CLI from a generated deploy directory. A Vercel project doesn't
-need to be connected to this Git repository, and when it isn't, merges deploy nothing;
-every release is a deliberate step.
-
-**Code-only release.** Use this when server code changed but the routing data didn't (for
-example, after `main` picks up adapter fixes). No rebuild or registry push is needed.
-1. Find the region's current release in `<data_dir>/RUNS.md`: its `$WORK`, image digest and
-   last `deploy-v<N>`.
-2. Update the checkout (`git checkout main && git pull`), then run `npm test`.
-3. Generate a new deploy directory against the **same** data image:
-   ```sh
-   .venv/bin/python scripts/prepare-release.py --region <slug> --runtime "$WORK/runtime" \
-     --image $IMG@sha256:<current digest> --vercel-region <vercel_region> --output "$WORK/deploy-v<N+1>"
-   ```
-   `prepare-release.py` checks the local runtime package against that image, so keep the
-   current release's `$WORK/runtime/` on disk.
-   - If it rejects the runtime because code and data have drifted apart (for example, a new
-     engine patch or config change that alters the data lock), the release needs a data
-     rebuild. Go back to the runbook in section 4.
-4. Link, deploy with `--skip-domain`, verify, and promote with the user's approval, exactly
-   as in step 6 of the runbook. Record it in `RUNS.md`.
-
-**Rollback.** Use this when a promoted release misbehaves.
-1. Find the previous production deployment with `vercel ls <project> --scope <scope>`, or
-   in `RUNS.md`.
-2. With the user's approval, run `vercel promote <previous deployment URL> --scope <scope>`.
-   The domain moves immediately, with no rebuild.
-3. Verify the public domain (`/health` and a smoke trip), then record the rollback and its
-   reason in `RUNS.md`.
-
-Old deployments stay available, but they pull their data image by digest. Never delete
-the data image a rollback target depends on.
 
 ## Approval gates
 
 Stop and ask before each of these:
 - approving review items or a new region's bounds and states;
-- pushing to the registry, deploying, promoting, or changing domains;
+- pushing to the registry (deploy and promotion gates are in release-backend);
 - deleting old images or workspaces.
 
-Keep the current release and one rollback release. The docs warn that deleting a pinned
-base image breaks rebuilds.
+Keep the current and previous release's images and `$WORK/runtime/`: code releases and
+rollbacks depend on them, and the docs warn that deleting a pinned base image breaks
+rebuilds.
 
 ## Lessons learned
 
@@ -209,7 +168,7 @@ General findings, dated and specific.
   - California download: 23 minutes. Only the downloads are worth optimizing.
   - One-off steps: DEM 100 s, toolchain image 220 s.
   - Everything after the downloads: about 131 s.
-  - Image push about 1 minute; Vercel deploy under 1 minute.
+  - Image push about 1 minute.
 - **Builds aren't byte-reproducible.** A rerun with the same inputs gave identical routes,
   review and policy indexes. But `admin.sqlite` and some tiles differed, so
   `engine-policy.json` changes every build. Compare routes, not hashes, and don't spend time
@@ -223,13 +182,6 @@ General findings, dated and specific.
   not data.
 - **Hill cost:** steep side-slopes inflate it (see `docs/HILL-COST.md` if present).
   Scenario 2 detours on mountain highways are a known engine issue, not a build failure.
-- **`vercel curl` must run from inside the deploy directory.** It passes `--cwd` through to
-  curl, which rejects it. Deployment URLs are behind Vercel Deployment Protection (plain curl
-  gets a 302); only the promoted custom domain is public.
-- **New domains:** if the parent domain has a wildcard DNS record, resolvers (Vercel's
-  included) can cache the wildcard answer for its TTL when queried before the CNAME exists.
-  The certificate then waits until that cache expires. Don't run `vercel domains verify`
-  before the user has added the record.
 - **zsh:** an unquoted `$VAR` holding "lat lon" doesn't split into two arguments. Use arrays.
 
 ## Region notes
