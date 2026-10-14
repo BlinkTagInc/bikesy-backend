@@ -29,6 +29,7 @@ are:
   "regions": {
     "<slug>": {
       "deploy_method": "cli | git",
+      "vercel_account": "<Vercel username the CLI must be logged in as>",
       "vercel_scope": "<team slug>",
       "vercel_project": "<project>",
       "vercel_region": "sfo1",
@@ -44,6 +45,22 @@ save the answers. Don't guess from someone else's setup.
 - **`cli`:** releases are made with `vercel deploy` from a generated deploy directory, and the
   project isn't driven by Git.
 - **`git`:** the Vercel project is connected to this repository and deploys what's merged.
+
+**Check the Vercel account before every Vercel CLI session** (deploy, promote, `vcr
+login`, domains, `ls`, `curl`). The CLI keeps one login at a time, and a machine may be used
+with several accounts.
+- Run `vercel whoami`. It must print the region's `vercel_account`.
+- Run `vercel teams ls`. It must list `vercel_scope`.
+- If either check fails, **stop**. Ask the user to run `vercel logout` and then `vercel login`
+  with the right account; logging in is interactive, so the user has to do it. Then check
+  again.
+- If `vercel_account` isn't set yet, show the user the current account and ask whether it's
+  the right one before saving it.
+- Recheck after any pause in which the user may have switched accounts, and before a
+  promote or rollback.
+- Always pass `--scope <vercel_scope>` explicitly rather than relying on the CLI's current
+  team. Rerun `vercel vcr login` after switching accounts, because registry credentials
+  belong to the account that created them.
 
 Releases are recorded in `<data_dir>/RUNS.md` (`data_dir` is in the same file): for each,
 the region, image digest, `$WORK`, deploy directory or commit, deployment URL, and outcome.

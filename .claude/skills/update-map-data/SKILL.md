@@ -134,12 +134,15 @@ Never put raw data or build output in Git.
 6. **Publish the data image (needs the user's approval).** Push the new runtime as an
    immutable data image to the region's Vercel project registry:
    ```sh
-   vercel whoami                                    # must be an account in <vercel_scope>
+   vercel whoami                                    # must print <vercel_account>
    vercel vcr login docker --scope <scope> --project <project>     # valid ~12 h
    IMG=vcr.vercel.com/<scope>/<project>/routing-data
    docker build --platform linux/amd64 -t $IMG:v<N>-<YYMMDD> "$WORK/runtime"
    docker push $IMG:v<N>-<YYMMDD>                   # record the digest
    ```
+   First run the account check described in release-backend § 1: `vercel whoami` must print
+   the region's `vercel_account`, and `vercel teams ls` must list `vercel_scope`. If either
+   doesn't match, stop and ask the user to log in to the right account.
    Then follow the **release-backend** skill for a *data release* with that digest and
    `$WORK`. It covers the region's deploy method, verification against
    `$WORK/smoke-region.json`, promotion, and new-domain setup.
