@@ -1,6 +1,6 @@
 ---
 name: update-map-data
-description: Refresh a region's routing data from the latest OpenStreetMap snapshot — download extracts, rebuild and validate the Valhalla graph, review access changes, package the runtime, and (with approval) publish and deploy it to Vercel. Use when asked to update or refresh map data or routing data for a region ("update the Tahoe map data", "update the contracosta map data", "pull in the latest OSM for SF"), or to set up routing data for a new region.
+description: Refresh a region's routing data from the latest OpenStreetMap snapshot — download extracts, rebuild and validate the Valhalla graph, review access changes, package the runtime, and (with approval) publish and deploy it to Vercel. Use when asked to update or refresh map data or routing data for a region ("update the Tahoe map data", "update the contracosta map data", "pull in the latest OSM for SF"), to set up routing data for a new region, or to release new backend code or roll back a region's deployment ("deploy the latest backend code to Tahoe", "roll back the Tahoe backend").
 ---
 
 # Update map data
@@ -155,6 +155,41 @@ output in Git.
    `engine-policy.json` sha256, image tag and digest, deployment URL, timings from
    `$WORK/timings.tsv`, and issues. Add new general findings to the lessons below, and
    deployer-specific ones to the local settings `notes`.
+
+## 5. Code-only release and rollback
+
+Deploys are made with the CLI from a generated deploy directory. A Vercel project doesn't
+need to be connected to this Git repository, and when it isn't, merges deploy nothing;
+every release is a deliberate step.
+
+**Code-only release.** Use this when server code changed but the routing data didn't (for
+example, after `main` picks up adapter fixes). No rebuild or registry push is needed.
+1. Find the region's current release in `<data_dir>/RUNS.md`: its `$WORK`, image digest and
+   last `deploy-v<N>`.
+2. Update the checkout (`git checkout main && git pull`), then run `npm test`.
+3. Generate a new deploy directory against the **same** data image:
+   ```sh
+   .venv/bin/python scripts/prepare-release.py --region <slug> --runtime "$WORK/runtime" \
+     --image $IMG@sha256:<current digest> --vercel-region <vercel_region> --output "$WORK/deploy-v<N+1>"
+   ```
+   `prepare-release.py` checks the local runtime package against that image, so keep the
+   current release's `$WORK/runtime/` on disk.
+   - If it rejects the runtime because code and data have drifted apart (for example, a new
+     engine patch or config change that alters the data lock), the release needs a data
+     rebuild. Go back to the runbook in section 4.
+4. Link, deploy with `--skip-domain`, verify, and promote with the user's approval, exactly
+   as in step 6 of the runbook. Record it in `RUNS.md`.
+
+**Rollback.** Use this when a promoted release misbehaves.
+1. Find the previous production deployment with `vercel ls <project> --scope <scope>`, or
+   in `RUNS.md`.
+2. With the user's approval, run `vercel promote <previous deployment URL> --scope <scope>`.
+   The domain moves immediately, with no rebuild.
+3. Verify the public domain (`/health` and a smoke trip), then record the rollback and its
+   reason in `RUNS.md`.
+
+Old deployments stay available, but they pull their data image by digest. Never delete
+the data image a rollback target depends on.
 
 ## Approval gates
 
