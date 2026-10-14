@@ -40,7 +40,7 @@ Health is available at `/health`; use `/route` and `/bounds` to test the API. Th
 
 ## Regional builds
 
-SF remains the default. Tahoe uses the same backend with separate routing data, region settings and release manifests. See [Building SF and Tahoe](docs/REGIONS.md) for input preparation, reviewed build gates, application image generation and frontend configuration. `BIKESY_CONFIG=./config/tahoe.json` in `.env` selects Tahoe for adapter development; production startup requires matching Tahoe data.
+SF remains the default. Tahoe, and any further region, uses the same backend with separate routing data, a `config/REGION.json` file and its own release manifests. See [Regional builds](docs/REGIONS.md) for the config reference, [adding a region](docs/REGIONS.md#adding-a-region), input preparation, reviewed build gates, application image generation and frontend configuration. `BIKESY_CONFIG=./config/tahoe.json` in `.env` selects Tahoe for adapter development; production startup requires matching Tahoe data.
 
 ## Deploy to Vercel
 
@@ -142,11 +142,11 @@ Keep `Dockerfile.vercel` and `vercel.json` at the deployment root. In Vercel Pro
 Settings, avoid overriding the container framework with a Node framework or npm
 build command. The Dockerfile already sets:
 
-| Setting | SF generated image | Tahoe generated image |
-| --- | --- | --- |
-| `BIKESY_CONFIG` | `/app/config/sf.json` | `/app/config/tahoe.json` |
-| `PORT` | `80` | `80` |
-| `MAX_CONCURRENT_ROUTES` | `2` | `2` |
+| Setting | Generated image for `--region REGION` |
+| --- | --- |
+| `BIKESY_CONFIG` | `/app/config/REGION.json` (for example `/app/config/tahoe.json`) |
+| `PORT` | `80` |
+| `MAX_CONCURRENT_ROUTES` | `2` |
 
 No `.env` upload is needed. If the project has environment-variable overrides,
 ensure they agree with these values. Leave `VALHALLA_URL` unset to use the engine
@@ -184,6 +184,7 @@ vercel curl '/route?lat1=39.1667&lng1=-120.1439&lat2=39.1725&lng2=-120.1385&scen
   --cwd "$BIKESY_DEPLOY_DIR" --deployment "$BIKESY_DEPLOY_URL"
 ```
 
+For another region, use its readiness trip and each configured scenario.
 Check for `path`, `directions`, positive `total_distance` and an `elevation_profile`.
 An HTTP 200 containing `error` is a failed route. Inspect build logs for release/hash
 verification and runtime logs for `engine_policy_verified` and `ready`:

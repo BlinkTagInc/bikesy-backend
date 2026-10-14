@@ -39,10 +39,10 @@ extra or invalid state polygons. Never clip administrative polygons to the route
 Lock the inputs and review the access/facility inventory as described in REGIONS.md.
 Motorway exceptions require review; neither this helper nor a new region grants them.
 
-Additional US regions can use a safe lowercase slug in `config/SLUG.json`, complete
-US state abbreviations, bounds, insets, scenarios and in-region readiness locations.
-Pass that slug to rebuild/package/prepare commands. Non-US driving/admin rules are
-not implemented. SF defaults and Tahoe's existing two-scenario public configuration
+Additional US regions need only `config/SLUG.json` plus their reviewed inputs; see
+[Adding a region](REGIONS.md#adding-a-region) for the checklist and
+`node scripts/check-region.mjs SLUG` to validate the config. Pass that slug to the
+rebuild/package/prepare commands. Non-US driving/admin rules are not implemented. SF defaults and Tahoe's existing two-scenario public configuration
 remain unchanged. A nine-scenario Tahoe experiment must use its own config snapshot.
 
 ## Build a self-contained application image
