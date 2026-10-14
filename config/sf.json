@@ -1,9 +1,9 @@
 {
   "bounds": {
-    "left": -123.029,
-    "bottom": 37.3064,
-    "right": -121.637,
-    "top": 38.317
+    "left": -123.15,
+    "bottom": 37.2,
+    "right": -121.51,
+    "top": 38.42
   },
   "scenarios": {
     "1": {
@@ -51,5 +51,28 @@
       "use_roads": 0
     }
   },
-  "engine_policy": "bikesy-distance-v1"
+  "engine_policy": "bikesy-distance-v1",
+  "region": "sf",
+  "admin_states": [
+    "CA"
+  ],
+  "readiness": {
+    "locations": [
+      {
+        "lat": 37.77201183539485,
+        "lon": -122.45188647879988
+      },
+      {
+        "lat": 37.761314357988724,
+        "lon": -122.42157490354151
+      }
+    ],
+    "scenario": "8"
+  },
+  "bounds_inset": {
+    "left": 0.121,
+    "bottom": 0.1064,
+    "right": 0.127,
+    "top": 0.103
+  }
 }

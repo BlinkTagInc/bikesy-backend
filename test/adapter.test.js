@@ -34,7 +34,7 @@ test('all SF scenarios preserve hills and facilities axes', () => {
   assert.deepEqual(parseQuery(query('&scenario='), config), parseQuery(query(), config));
 });
 test('Tahoe has only two scenarios with no hill control', () => {
-  const c = loadConfig({ BIKESY_REGION: 'tahoe' });
+  const c = loadConfig({ BIKESY_CONFIG: 'config/tahoe.json' });
   const q = new URLSearchParams('lat1=39&lat2=39.1&lng1=-120&lng2=-120.1');
   assert.equal(parseQuery(q, c).costing_options.bicycle.use_roads, 0);
   q.set('scenario', '2');
@@ -130,7 +130,7 @@ test('live legacy capture and adapter have the same successful response structur
   }
 });
 test('invalid configuration fails at startup', () => {
-  for (const env of [{ BIKESY_REGION: 'unknown' }, { VALHALLA_TIMEOUT_MS: 'NaN' }, { VALHALLA_URL: 'file:///tmp/data' }]) assert.throws(() => loadConfig(env));
+  for (const env of [{ BIKESY_CONFIG: 'config/unknown.json' }, { VALHALLA_TIMEOUT_MS: 'NaN' }, { VALHALLA_URL: 'file:///tmp/data' }]) assert.throws(() => loadConfig(env));
 });
 test('real pinned Valhalla offline OSM response converts to the legacy contract', () => {
   const response = JSON.parse(readFileSync(new URL('./fixtures/valhalla-offline-sf-scenario5.json', import.meta.url)));

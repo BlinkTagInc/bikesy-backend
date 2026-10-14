@@ -1,0 +1,11 @@
+{
+  "sf": [
+    {"name":"Wiggle", "locations":[{"lat":37.77201,"lon":-122.45189},{"lat":37.76131,"lon":-122.42157}]}
+  ],
+  "tahoe": [
+    {"name":"Tahoe City", "locations":[{"lat":39.1667,"lon":-120.1439},{"lat":39.1725,"lon":-120.1385}]},
+    {"name":"South Lake to Stateline", "locations":[{"lat":38.945,"lon":-119.973},{"lat":38.960,"lon":-119.945}]},
+    {"name":"Incline Village to Crystal Bay", "locations":[{"lat":39.245,"lon":-119.952},{"lat":39.228,"lon":-120.006}]},
+    {"name":"Kings Beach to Tahoe City", "locations":[{"lat":39.238,"lon":-120.027},{"lat":39.1725,"lon":-120.1385}]}
+  ]
+}

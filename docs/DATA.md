@@ -2,6 +2,8 @@
 
 Normal Git pushes reuse the already-hosted immutable runtime image. No PBF, DEM, tiles, database or executable belongs in Git. The bootstrap data artifact is the existing VCR digest in `release.json`; no object-storage upload is needed.
 
+For Tahoe or separate regional application images, follow [REGIONS.md](REGIONS.md). SF remains the default; region-specific build evidence now lives under `build/sf/` or `build/tahoe/`.
+
 ## Rebuild prerequisites
 
 The tested build is Valhalla 3.5.1, source commit `d377c8ace9ea88dfa989466258bf738b1080f22a`, runtime digest in `engine/source-lock.json`. `engine/bikesy-3.5.1.patch` includes both the distance/ferry policy and counted stairs. `python3 engine/apply_patch.py --check` reconstructs it with strict context matching and validates the vendored upstream and complete patched source hashes. It does not download anything. `--apply` explicitly restores the two patched upstream source files.
@@ -14,7 +16,7 @@ Allow 2 CPUs, 6 GiB RAM and roughly 8 GiB temporary disk. Raw rebuild inputs are
 - Full California extract, originally `california-260930.osm.pbf`, copied as `admin-input.osm.pbf`: `1c5d4f0f765fac1e56a2aa4f04ad48489a579a94e41edc12b57b7c7c13860db1`.
 - Six decompressed HGT files under `elevation/`; all input paths/hashes are in `graph/inputs.lock.json`.
 
-These originals remain in the validation workspace's `handoff/valhalla-backend/data/extended-bay/`. Keep an independent backup for long-term exact reproduction. A current download may contain different bytes and must not silently replace the input lock. The admin correction is California-specific. Changing input geography/date requires renewed access/facility review and route calibration.
+These originals remain in the validation workspace's `handoff/valhalla-backend/data/extended-bay/`. Keep an independent backup for long-term exact reproduction. A current download may contain different bytes and must not silently replace the input lock. The default SF admin correction uses California; Tahoe requires complete California and Nevada administrative polygons. Changing input geography/date requires renewed access/facility review and route calibration.
 
 ## Fresh offline build
 
@@ -31,10 +33,10 @@ docker cp "$BIKESY_INPUTS/region.osm.pbf" bikesy-data-rebuild:/data/region.osm.p
 docker cp "$BIKESY_INPUTS/california-260930.osm.pbf" bikesy-data-rebuild:/data/admin-input.osm.pbf
 docker cp "$BIKESY_INPUTS/elevation" bikesy-data-rebuild:/data/elevation
 docker exec bikesy-data-rebuild python3 /work/scripts/rebuild-variant.py
-docker exec bikesy-data-rebuild python3 /work/scripts/package-data.py /data /work/build/runtime
+docker exec bikesy-data-rebuild python3 /work/scripts/package-data.py /data /work/build/sf/runtime
 mkdir -p build
-docker cp bikesy-data-rebuild:/work/build/runtime build/runtime
-docker cp bikesy-data-rebuild:/work/build/evidence build/rebuild-evidence
+docker cp bikesy-data-rebuild:/work/build/sf/runtime build/runtime
+docker cp bikesy-data-rebuild:/work/build/sf/evidence build/rebuild-evidence
 docker rm -f bikesy-data-rebuild
 docker build --platform linux/amd64 -t bikesy-routing-data:candidate build/runtime
 ```

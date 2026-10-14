@@ -15,7 +15,8 @@ parser.add_argument('--resume', action='store_true', help='Reuse complete tiles 
 args = parser.parse_args()
 if (args.data / 'inputs.lock.json').exists():
     raise SystemExit('Refusing to modify a locked data release')
-b = json.loads(args.config.read_text())['bounds']
+config = json.loads(args.config.read_text())
+b = config['bounds']
 for lat in range(math.floor(b['bottom']), math.floor(b['top']) + 1):
     for lon in range(math.floor(b['left']), math.floor(b['right']) + 1):
         ns = f'{"N" if lat >= 0 else "S"}{abs(lat):02}'

@@ -1,3 +1,4 @@
+import { verifyRegionData } from './config.js';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
@@ -13,6 +14,7 @@ export function verifyStartupData({
   dataRoot = '/data',
   configPath,
   policy,
+  region = 'sf',
   mode = 'light',
 }) {
   if (!['light', 'full'].includes(mode)) throw Error('Invalid BIKESY_DATA_VERIFICATION; use light or full');
@@ -28,6 +30,13 @@ export function verifyStartupData({
     throw Error('Graph policy version mismatch');
   if (lock.stair_policy !== 'counted-stairs-v1') throw Error('Stair policy version mismatch');
   if (lock.engine_sha256 !== release.engine_sha256) throw Error('Engine release identity mismatch');
+
+  if ((release.region || 'sf') !== region || (lock.region || 'sf') !== region) {
+    throw Error('Routing data region differs from application region');
+  }
+
+  const activeConfig = JSON.parse(readFileSync(configPath));
+  verifyRegionData({ ...activeConfig, region }, lock);
 
   const configHash = sha(readFileSync(configPath));
   const knownConfigs = Object.entries(release.runtime_files)

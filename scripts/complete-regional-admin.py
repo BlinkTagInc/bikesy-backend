@@ -1,23 +1,50 @@
-"""Complete a California-only regional admin DB using its real OSM state polygon.
+"""Join complete CA/NV state polygons to a regional US parent.
 
-The derived US polygon is deliberately clipped to California, not a fabricated
-national boundary. This helper is invalid for routing outside California. It
-retains the actual state's geometry and supplies the known US parent required
-by Valhalla's state/country join. US access defaults come from pinned C++ headers.
+Inputs must contain exactly the requested state polygons, or those states plus
+an existing US parent. Never substitute a routing rectangle for admin geometry.
 """
-import sqlite3,pathlib,sys,json,hashlib
-p=pathlib.Path(sys.argv[1]);defaults=json.loads(pathlib.Path(sys.argv[2]).read_text());before=hashlib.sha256(p.read_bytes()).hexdigest()
-c=sqlite3.connect(p);c.enable_load_extension(True);c.load_extension('mod_spatialite')
-state=c.execute("select rowid from admins where admin_level=4 and iso_code='CA' and name='California' and drive_on_right=1 and ST_IsValid(geom)=1").fetchall()
-if len(state)!=1 or c.execute('select count(*) from admins').fetchone()[0]!=1:raise ValueError('Requires exact California-only extract; refuse other administrative scope')
-sid=state[0][0]
+from region_common import US_STATES
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import sqlite3
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('database', type=Path)
+parser.add_argument('defaults', type=Path)
+parser.add_argument('--states', nargs='+', choices=US_STATES, default=['CA'])
+a = parser.parse_args()
+if len(a.states) != len(set(a.states)):
+    parser.error('Duplicate state')
+before = hashlib.sha256(a.database.read_bytes()).hexdigest()
+defaults = json.loads(a.defaults.read_text())
+c = sqlite3.connect(a.database)
+c.enable_load_extension(True)
+c.load_extension('mod_spatialite')
+states = c.execute("SELECT rowid, iso_code FROM admins WHERE admin_level=4 AND drive_on_right=1 AND ST_IsValid(geom)=1").fetchall()
+if len(states) != len(a.states) or {s[1] for s in states} != set(a.states):
+    raise ValueError('Admin input must contain exactly the requested complete state polygons')
+parents = c.execute("SELECT rowid FROM admins WHERE admin_level=2 AND iso_code='US' AND drive_on_right=1 AND ST_IsValid(geom)=1").fetchall()
+if len(parents) > 1 or c.execute('SELECT count(*) FROM admins').fetchone()[0] != len(states) + len(parents):
+    raise ValueError('Unexpected administrative scope')
 with c:
- c.execute("insert into admins(admin_level,iso_code,parent_admin,name,name_en,drive_on_right,allow_intersection_names,default_language,geom) select 2,'US',NULL,'United States','United States',1,0,NULL,geom from admins where rowid=?",(sid,))
- uid=c.execute('select last_insert_rowid()').fetchone()[0]
- c.execute('update admins set parent_admin=? where rowid=?',(uid,sid))
- c.execute('insert into admin_access values(?,?,?,?,?,?,?,?,?,?,?)',[uid,'US']+[None if v<0 else v for v in defaults])
- for lat,lon in [(37.78,-122.42),(38.31,-122.296),(37.31,-121.95),(38.08,-122.23),(37.82,-122.36)]:
-  assert c.execute("select count(*) from admins where admin_level=2 and ST_Contains(geom,MakePoint(?,?,4326))",(lon,lat)).fetchone()[0]==1
+    if parents:
+        uid = parents[0][0]
+    else:
+        c.execute("""INSERT INTO admins(admin_level,iso_code,parent_admin,name,name_en,drive_on_right,allow_intersection_names,default_language,geom)
+            SELECT 2,'US',NULL,'United States','United States',1,0,NULL,ST_Union(geom) FROM admins WHERE admin_level=4""")
+        uid = c.execute('SELECT last_insert_rowid()').fetchone()[0]
+        c.execute('INSERT INTO admin_access VALUES(?,?,?,?,?,?,?,?,?,?,?)', [uid, 'US'] + [None if v < 0 else v for v in defaults])
+    for sid, code in states:
+        c.execute('UPDATE admins SET parent_admin=? WHERE rowid=?', (uid, sid))
+        if not c.execute('SELECT ST_Covers(p.geom,s.geom) FROM admins p, admins s WHERE p.rowid=? AND s.rowid=?', (uid, sid)).fetchone()[0]:
+            raise ValueError(f'US parent does not cover {code}')
 c.close()
-p.with_suffix('.regional-manifest.json').write_text(json.dumps({'scope':'California-only; derived US footprint equals authoritative locked OSM California polygon; not usable outside that polygon','input_sha256':before,'output_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'state_id':sid,'country_id':uid,'US_access_defaults_from_pinned_headers':defaults,'graph_gate':'Require right-side driving for every bicycle-accessible node after graph construction'},indent=2))
-print('California state joined to regional US parent; official pinned US access defaults retained')
+a.database.with_suffix('.regional-manifest.json').write_text(json.dumps({
+    'scope': a.states, 'geometry': 'Authoritative input state polygons; no coverage outside their union is implied',
+    'input_sha256': before, 'output_sha256': hashlib.sha256(a.database.read_bytes()).hexdigest(),
+    'state_ids': dict((code, sid) for sid, code in states), 'country_id': uid,
+    'US_access_defaults_from_pinned_headers': defaults,
+}, indent=2))
+print('Regional US parent verified for', ', '.join(a.states))

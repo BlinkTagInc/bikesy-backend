@@ -4,13 +4,13 @@ ARG BIKESY_RUNTIME_IMAGE=vcr.vercel.com/blinktag/bikesy-backend/dockerfile@sha25
 FROM ${BIKESY_RUNTIME_IMAGE}
 USER root
 WORKDIR /app
-COPY package.json serve.mjs stage.html release.json ./
+COPY package.json serve.mjs release.json ./
 COPY src ./src
 COPY config ./config
 COPY graph/deployed-runtime.lock.json ./graph/deployed-runtime.lock.json
 COPY scripts/verify-release.mjs ./scripts/verify-release.mjs
-RUN rm -f /app/preview-manifest.json && chmod -R a+rX /app && node scripts/verify-release.mjs --image
+RUN rm -f /app/preview-manifest.json /app/stage.html /app/src/stage-elevation.js /app/src/bridge-notices.js /app/config/sample.json && chmod -R a+rX /app && node scripts/verify-release.mjs --image
 USER 65534:65534
-ENV PORT=80 BIKESY_CONFIG=/app/config/sample.json MAX_CONCURRENT_ROUTES=2
+ENV PORT=80 BIKESY_CONFIG=/app/config/sf.json MAX_CONCURRENT_ROUTES=2
 EXPOSE 80
 ENTRYPOINT ["node", "/app/serve.mjs"]

@@ -3,15 +3,14 @@ import { randomUUID, createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { createHandler } from './src/server.js';
-import { loadConfig, resolveConfigPath } from './src/config.js';
+import { loadConfig, resolveConfigPath, readinessRequest } from './src/config.js';
 import { verifyStartupData } from './src/verify-startup.js';
-import { createStageElevationHandler } from './src/stage-elevation.js';
 import { createStartupTiming } from './src/startup-timing.js';
 const instance = randomUUID();
 const startup = createStartupTiming({ instance });
 const config = loadConfig();
 const verification = startup.measureSync('data_verification', () => verifyStartupData({
-  configPath: resolveConfigPath(), policy: config.engine_policy,
+  configPath: resolveConfigPath(), policy: config.engine_policy, region: config.region,
   mode: process.env.BIKESY_DATA_VERIFICATION ?? 'light',
 }));
 const { lock } = verification;
@@ -65,7 +64,7 @@ while (!stopping && performance.now() < deadline) {
     if (response.ok && (await response.json()).version) {
       finishEngineReadiness();
       const route = await startup.measure('route_probe', async () => {
-        const probe = { locations: [{lat:37.77201183539485,lon:-122.45188647879988},{lat:37.761314357988724,lon:-122.42157490354151}], costing:'bicycle', costing_options:{bicycle:{bicycle_type:'Hybrid',...config.scenarios['8']}}, shape_format:'polyline6' };
+        const probe = readinessRequest(config);
         const routeResponse = await fetch(`${config.valhallaUrl}route`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(probe), signal:AbortSignal.timeout(5000) });
         const route = await routeResponse.json();
         if (!routeResponse.ok || !route.trip?.legs?.[0]?.shape) throw Error('Readiness route failed');
@@ -88,18 +87,9 @@ else if (!stopping) {
   else {
     const finishHttpReady = startup.phase('http_ready');
     const apiHandler = createHandler(config);
-    const stageElevation = createStageElevationHandler(config);
-    const stageHtml = readFileSync('/app/stage.html');
     server = http.createServer({ requestTimeout: 30000, headersTimeout: 10000 }, (req, res) => {
       res.setHeader('x-bikesy-policy', config.engine_policy || 'stock');
       if(config.engine_policy){const p=JSON.parse(readFileSync('/data/engine-policy.json'));res.setHeader('x-bikesy-graph-policy',p.graph_access_policy);res.setHeader('x-bikesy-engine-sha256',p.engine_sha256);res.setHeader('x-bikesy-import-policy',p.graph_import_policy);res.setHeader('x-bikesy-stair-policy',p.stair_policy);}
-      if (['GET', 'HEAD'].includes(req.method) && ['/stage', '/stage/'].includes(req.url.split('?')[0])) {
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store');
-        res.end(req.method === 'HEAD' ? undefined : stageHtml);
-        return;
-      }
-      if (req.url.split('?')[0] === '/stage/elevation') return stageElevation(req, res);
       return apiHandler(req, res);
     });
     memorySample('ready');

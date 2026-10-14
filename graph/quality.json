@@ -1,0 +1,23 @@
+{
+  "region": "sf",
+  "minimum_bicycle_nodes": 1000001,
+  "facilities": [
+    {
+      "way": 1384008086,
+      "cyclelane": 3
+    },
+    {
+      "way": 1427349494,
+      "cyclelane": 3
+    },
+    {
+      "way": 1383954427,
+      "cyclelane": 3
+    },
+    {
+      "way": 24335458,
+      "cyclelane": 1
+    }
+  ],
+  "expected_walking_edges": 10
+}

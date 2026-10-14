@@ -1,14 +1,17 @@
 # Bikesy Valhalla backend
 
-Git-ready source for the corrected regional import and counted-stairs engine deployed on October 4, 2026. It includes the legacy-compatible routing API, nine SF scenarios, queue/cancellation controls, old/new comparison grid, elevation comparison, and 16 geographic/bridge presets. The configured hill weights are unchanged; there is no experimental detour selector.
+Git-ready source for the corrected regional import and counted-stairs engine deployed on October 4, 2026. It includes the legacy-compatible routing API, nine SF scenarios, queue/cancellation controls, and native route elevation profiles. The configured hill weights are unchanged; there is no experimental detour selector.
 
-**Routing data stays in Vercel Container Registry, outside Git.** `Dockerfile.vercel` inherits the exact existing private image by SHA-256 digest, overlays this repository's application, and verifies the engine and 56 data files at image build. Normal startup checks release identity, configuration, data-file readability and the engine hash; full startup data hashing is available explicitly. Routes and cold starts do not download or rebuild OSM/DEM data.
+**Routing data stays in Vercel Container Registry, outside Git.** Each application image inherits a regional data image by SHA-256 digest, overlays the application, and verifies the engine and data files at image build. The checked-in Dockerfile references the original owner's private SF image; deployers using their own Vercel account must publish their own data package and generate a matching application directory as described below. Normal startup checks release identity, configuration, data-file readability and the engine hash; full startup data hashing is available explicitly. Routes and cold starts do not download or rebuild OSM/DEM data.
+
+For an independent account or self-contained Docker image, start with
+[External deployment](docs/EXTERNAL-DEPLOYMENT.md). It does not require BlinkTag image access.
 
 ## Start here
 
-1. The production backend is [api.bikesy.com](https://api.bikesy.com); the canonical routing endpoint is `/route`.
+1. The canonical routing endpoint is `/route`. [api.bikesy.com](https://api.bikesy.com) is a public SF example; your deployment will have its own URL.
 2. Use the [API examples below](#api-examples) for requests, responses and compatibility details.
-3. Run source checks with Node 22+ and Python 3.12; there are no npm dependencies:
+3. Run source checks with Node 22.9+ and Python 3.12; there are no npm dependencies:
 
 ```sh
 npm test
@@ -18,19 +21,200 @@ npm run verify:release
 python3 engine/apply_patch.py --check
 ```
 
-Current package validation and its limits are in [VALIDATION.md](docs/VALIDATION.md). Source hashes in `release.json` identify the current local runtime source; source changes still require deployment. The pinned engine and routing-data image remain unchanged.
+Regional build steps and verification limits are in [REGIONS.md](docs/REGIONS.md). Source hashes in `release.json` identify the current local runtime source; source changes still require deployment. The checked-in release describes the original SF artifact; your generated release manifest binds your own engine and data image.
 
 ## Run locally
 
-With Docker access to the private VCR base (see [Where the data comes from](#where-the-data-comes-from)):
+After publishing your data image and generating an application directory using
+[Deploy to Vercel](#deploy-to-vercel), build that directory locally. Keep the
+`BIKESY_DEPLOY_DIR` value from those steps and authenticate Docker to your registry:
 
 ```sh
-docker build --platform linux/amd64 -f Dockerfile.vercel -t bikesy:local .
+docker build --platform linux/amd64 -f "$BIKESY_DEPLOY_DIR/Dockerfile.vercel" \
+  -t bikesy:local "$BIKESY_DEPLOY_DIR"
 docker run --rm --name bikesy-local --platform linux/amd64 --cpus 2 --memory 2g \
   -p 127.0.0.1:8080:80 bikesy:local
 ```
 
-The production comparison page is [api.bikesy.com/stage](https://api.bikesy.com/stage), and health is [api.bikesy.com/health](https://api.bikesy.com/health). The Docker command above deliberately binds only to the local loopback interface; for local development, open `/stage` on that mapped port. Apple Silicon uses amd64 emulation. This starts the new Valhalla backend only. The comparison page calls the public historical Bikesy API for its Old column; the packaged backend does not launch a legacy server. Stop the container with Ctrl-C. For JS-only development against an already running Valhalla engine, use `npm run start:adapter` and the variables in `.env.example`.
+Health is available at `/health`; use `/route` and `/bounds` to test the API. The Docker command above binds only to the local loopback interface. Apple Silicon uses amd64 emulation. Stop the container with Ctrl-C. For JS-only development against an already running Valhalla engine, use `npm run start:adapter` and the variables in `.env.example`.
+
+## Regional builds
+
+SF remains the default. Tahoe uses the same backend with separate routing data, region settings and release manifests. See [Building SF and Tahoe](docs/REGIONS.md) for input preparation, reviewed build gates, application image generation and frontend configuration. `BIKESY_CONFIG=./config/tahoe.json` in `.env` selects Tahoe for adapter development; production startup requires matching Tahoe data.
+
+## Deploy to Vercel
+
+This is a container deployment. `vercel.json` selects the `container` framework and
+`sfo1`; Vercel builds `Dockerfile.vercel` from the deployment directory. See
+[Vercel's container deployment guide](https://vercel.com/kb/guide/does-vercel-support-docker-deployments).
+Use a separate Vercel project for each region so SF and Tahoe keep independent data,
+configuration and domains.
+
+### 1. Validate the source
+
+Install the Vercel CLI (`npm install --global vercel`) and use Node 22.9+ and Python
+3.12+. Run these from this repository's root after making application changes:
+
+```sh
+node scripts/lock-source.mjs
+npm test
+npm run test:data
+npm run check
+npm run verify:release
+python3 engine/apply_patch.py --check
+```
+
+The source-lock command updates `release.json`; include it with the corresponding
+source changes. Both regions require a built and route-validated data package for
+your account, as described in the next step. Application deployment does not build OSM/DEM data.
+
+### 2. Build and publish data to your own Vercel project
+
+Create a project in your own Vercel account, using a separate project for each
+region. Set these values in your shell from the repository root; use your actual
+Vercel team/workspace slug and project slug. Change `tahoe` to `sf` for an SF release:
+
+```sh
+BIKESY_VERCEL_SCOPE='your-team-slug'
+BIKESY_PROJECT='your-bikesy-tahoe-project'
+BIKESY_RELEASE_REGION=tahoe
+BIKESY_RUNTIME_DIR='/absolute/path/to/tahoe-runtime'
+BIKESY_DEPLOY_DIR="build/${BIKESY_RELEASE_REGION}-app-v1"
+BIKESY_DATA_IMAGE="vcr.vercel.com/${BIKESY_VERCEL_SCOPE}/${BIKESY_PROJECT}/routing-data"
+```
+
+These are shell variables for the deployment commands, not application runtime
+settings. The generated image selects its runtime config with `BIKESY_CONFIG`.
+
+**Both SF and Tahoe need your own validated data package.** Follow
+[REGIONS.md](docs/REGIONS.md) to prepare inputs, build the engine/graph and run
+`scripts/package-data.py`. Set `BIKESY_RUNTIME_DIR` to that package directory,
+which must contain `Dockerfile`, `data/engine-policy.json`, routing data and
+`engine/valhalla_service`. Alternatively, obtain a compatible validated package
+from someone authorized to share it.
+
+The private image pinned in the repository is an original-owner artifact, not a
+public bootstrap image. Your account is not assumed to have access to it. The
+original SF input hashes and cached toolchain are also historical: if those inputs
+are unavailable, build and validate a fresh toolchain/data release with your own
+reviewed inputs rather than bypassing the checks. See [DATA.md](docs/DATA.md).
+
+Authenticate and publish your data package to your project's registry:
+
+```sh
+vercel login
+vercel vcr login docker --scope "$BIKESY_VERCEL_SCOPE" --project "$BIKESY_PROJECT"
+docker build --platform linux/amd64 \
+  -t "${BIKESY_DATA_IMAGE}:v1" "$BIKESY_RUNTIME_DIR"
+docker push "${BIKESY_DATA_IMAGE}:v1"
+```
+
+Copy the registry manifest digest printed by `docker push`. Generate a fresh
+application deployment directory using that digest, not the tag or local image ID:
+
+```sh
+BIKESY_DATA_DIGEST='sha256:REPLACE_WITH_ACTUAL_MANIFEST_DIGEST'
+python3 scripts/prepare-release.py \
+  --region "$BIKESY_RELEASE_REGION" \
+  --runtime "$BIKESY_RUNTIME_DIR" \
+  --image "${BIKESY_DATA_IMAGE}@${BIKESY_DATA_DIGEST}" \
+  --output "$BIKESY_DEPLOY_DIR"
+```
+
+The output directory must be new; use a new name for each regenerated release.
+Regenerate it after application/config edits because it contains a source snapshot.
+This workflow creates a Dockerfile and release locks referencing **your** data image
+for either region. Deploy the generated directory, not the repository root, whose
+Dockerfile still points to the original owner's private SF image.
+
+VCR authentication is project-scoped. Publish the data image to the same project
+that will deploy the application. Local registry login uses a short-lived credential;
+rerun it when expired. See the [VCR CLI documentation](https://vercel.com/docs/cli/vcr).
+
+### 3. Link the deployment folder and check runtime settings
+
+```sh
+vercel login
+vercel link --cwd "$BIKESY_DEPLOY_DIR" --scope "$BIKESY_VERCEL_SCOPE" --project "$BIKESY_PROJECT"
+```
+
+Keep `Dockerfile.vercel` and `vercel.json` at the deployment root. In Vercel Project
+Settings, avoid overriding the container framework with a Node framework or npm
+build command. The Dockerfile already sets:
+
+| Setting | SF generated image | Tahoe generated image |
+| --- | --- | --- |
+| `BIKESY_CONFIG` | `/app/config/sf.json` | `/app/config/tahoe.json` |
+| `PORT` | `80` | `80` |
+| `MAX_CONCURRENT_ROUTES` | `2` | `2` |
+
+No `.env` upload is needed. If the project has environment-variable overrides,
+ensure they agree with these values. Leave `VALHALLA_URL` unset to use the engine
+started inside the container. Changing only `BIKESY_CONFIG` cannot turn SF data into
+Tahoe data; startup rejects that mismatch. Keep `.vercel` and credentials out of Git.
+
+### 4. Deploy and verify before assigning production domains
+
+Build a candidate using Production environment settings without moving the
+project's production domains yet:
+
+```sh
+vercel deploy --cwd "$BIKESY_DEPLOY_DIR" --scope "$BIKESY_VERCEL_SCOPE" --prod --skip-domain
+```
+
+Set `BIKESY_DEPLOY_URL` to the URL returned by that command. Check the deployment
+with the linked CLI, which can access protected deployments:
+
+```sh
+BIKESY_DEPLOY_URL='https://YOUR-DEPLOYMENT.vercel.app'
+vercel curl /health --cwd "$BIKESY_DEPLOY_DIR" --deployment "$BIKESY_DEPLOY_URL"
+vercel curl /bounds --cwd "$BIKESY_DEPLOY_DIR" --deployment "$BIKESY_DEPLOY_URL"
+```
+
+Expect `{"status":"ok"}` and the selected region's **inset service bounds**. Then
+check an in-region route; use the command for the region being deployed:
+
+```sh
+# SF
+vercel curl '/route?lat1=37.77201&lng1=-122.45189&lat2=37.76131&lng2=-122.42157&scenario=5' \
+  --cwd "$BIKESY_DEPLOY_DIR" --deployment "$BIKESY_DEPLOY_URL"
+
+# Tahoe: repeat with scenario=2 to check both routing preferences.
+vercel curl '/route?lat1=39.1667&lng1=-120.1439&lat2=39.1725&lng2=-120.1385&scenario=1' \
+  --cwd "$BIKESY_DEPLOY_DIR" --deployment "$BIKESY_DEPLOY_URL"
+```
+
+Check for `path`, `directions`, positive `total_distance` and an `elevation_profile`.
+An HTTP 200 containing `error` is a failed route. Inspect build logs for release/hash
+verification and runtime logs for `engine_policy_verified` and `ready`:
+
+```sh
+vercel logs "$BIKESY_DEPLOY_URL" --cwd "$BIKESY_DEPLOY_DIR" --follow
+```
+
+If private image pulls or region/hash checks fail, correct the image access or
+source/data pairing before proceeding. The deployment flags are documented in
+[`vercel deploy`](https://vercel.com/docs/cli/deploy).
+
+### 5. Promote and connect the frontend
+
+After the candidate passes the checks above:
+
+```sh
+vercel promote "$BIKESY_DEPLOY_URL" --cwd "$BIKESY_DEPLOY_DIR" --scope "$BIKESY_VERCEL_SCOPE"
+```
+
+This promotes the tested production candidate; see
+[`vercel promote`](https://vercel.com/docs/cli/promote). Add the intended API domain
+in the project's Domains settings if it is not already configured, then repeat
+health, bounds and route checks through that domain. Set the frontend's
+`BIKESY_API_URL` to the corresponding `/route` URL and deploy the frontend separately.
+Retain the previous deployment and its data image for rollback.
+
+For later application-only updates in either region, reuse your published data
+image digest, regenerate the application directory, and repeat validation and
+deployment from that directory. Git-based deployments must point to your generated
+source context; ignored `build/` directories are not automatically deployed by a Git push.
 
 ## API examples
 
@@ -50,7 +234,7 @@ curl --get "$BASE_URL/route" \
   --data-urlencode 'scenario=5'
 ```
 
-`BASE_URL` defaults to the production backend. Override it only when deliberately testing a local instance or a protected Preview deployment. The comparison page uses same-origin requests for the new backend and keeps the historical Bikesy API for its Old column; the old API is a separate comparison source.
+`BASE_URL` defaults to the production backend. Override it only when deliberately testing a local instance or a protected Preview deployment.
 
 `lat1`/`lng1` are the start and `lat2`/`lng2` are the destination, in decimal degrees. All four are required and must lie within the configured bounds. `scenario` is optional and defaults to `1` when missing or empty. The canonical route is `/route`. Compatibility aliases `/api/route`, `/`, `/api.php` and `/api.php/` accept the same query and remain supported. `HEAD` and CORS `OPTIONS` are supported. `GET /bounds` (also `/api/bounds`) returns the service area, and `GET /health` returns `{"status":"ok"}`.
 
@@ -159,23 +343,29 @@ Other errors use the same envelope: HTTP 200 for `No route found` or `Location o
 
 ## Change code or data
 
-- Application change: edit `src/`, `serve.mjs`, `stage.html` or `config/sample.json`; test; run `node scripts/lock-source.mjs` to update source hashes; commit both code and `release.json`. The data image remains pinned.
+- Application change: edit `src/`, `serve.mjs` or `config/`; test; run `node scripts/lock-source.mjs` to update source hashes; commit both code and `release.json`. The data image remains pinned.
 - Engine/data change: follow [DATA.md](docs/DATA.md), validate a separate rebuilt release, publish a new immutable image after approval, and update the digest plus data/engine locks in one commit. Never mix old graph IDs with new indexes.
 - API contract and scenario mapping: [API examples](#api-examples).
 
-Existing limitations remain: bridge hours/closures are static, timezone data is absent, route-distance ordering and some regional detours/duplicates remain, unknown stair counts use a length fallback, and DEM heights are estimates. Tahoe configuration is retained for contract tests; this data image serves the Bay Area only.
+Existing limitations remain: bridge hours/closures are static, timezone data is absent, route-distance ordering and some regional detours/duplicates remain, unknown stair counts use a length fallback, and DEM heights are estimates. The checked-in data image serves the Bay Area only; Tahoe requires a separate regional data release using [REGIONS.md](docs/REGIONS.md).
 
 ## Where the data comes from
 
-The bootstrap already exists as this immutable private image:
+Routing data is not included in Git. Build a regional runtime package using
+[REGIONS.md](docs/REGIONS.md) and [DATA.md](docs/DATA.md), or obtain a compatible
+validated package you are authorized to use. Publish it to your own project's VCR
+repository, then run `scripts/prepare-release.py` with its immutable digest.
 
-```
-vcr.vercel.com/blinktag/bikesy-backend/dockerfile@sha256:6619a51429b555a865eabbe99bae03cb0d9676b1c5a47a0d33cd44c09a810da1
-```
+The image referenced by the checked-in `Dockerfile.vercel` and `release.json` is the
+original owner's private SF artifact. It contains the patched amd64 engine, 46 graph
+tiles, six HGT rasters, admin DB and policy/stair indexes. Its digest records provenance;
+it does not grant registry access. The own-account deployment workflow above does
+not require access to that image or membership in the original owner's team.
 
-It holds the patched amd64 engine, 46 graph tiles, six HGT rasters, admin DB, policy/stair indexes and config. Docker pulls those image layers during the build. Git contains only code, fixture snippets and hashes. The image digest pins the artifact; `graph/deployed-runtime.lock.json` binds individual files. Keep this base through deployment cleanups. Deleting its deployment-associated image can break future builds even if an already-built deployment still runs. A later separately named `routing-data` repository can hold releases independently; creating/pushing it is a separate approved maintenance operation.
-
-The registry is project-private; the digest is an identifier, not a credential. For a new developer machine, use authorized `vercel link --scope blinktag --project bikesy-backend`, then `vercel vcr login docker`, which creates a short-lived project credential. These setup commands were not run during packaging. Never commit `.vercel`, `.env`, Docker credentials or signed transfer URLs. Another Vercel project needs separately authorized access or its own copied data image.
+Your generated `release.json` and `graph/deployed-runtime.lock.json` bind the new
+image, engine and individual data files. Retain your published data image while
+application releases depend on it; deleting it breaks future builds. Never commit
+`.vercel`, `.env`, Docker credentials, raw routing data or signed transfer URLs.
 
 ## Startup timing
 

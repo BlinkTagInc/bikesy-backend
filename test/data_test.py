@@ -1,3 +1,4 @@
+import sys
 import json
 from pathlib import Path
 import subprocess
@@ -14,7 +15,7 @@ class DataLockTests(unittest.TestCase):
             cfg.write_text(json.dumps({'bounds': {'left': 0.1, 'bottom': 0.1, 'right': 0.9, 'top': 0.9}}))
             (root / 'region.osm.pbf').write_bytes(b'OSM fixture placeholder for checksum test only')
             def run(*args):
-                return subprocess.run(['python3', str(SCRIPT), str(root), str(cfg), *args], capture_output=True, text=True)
+                return subprocess.run([sys.executable, str(SCRIPT), str(root), str(cfg), *args], capture_output=True, text=True)
             self.assertNotEqual(run('--osm-source', 'test', '--dem-source', 'test').returncode, 0)
             tile = root / 'elevation/N00/N00E000.hgt'
             tile.parent.mkdir(parents=True)
@@ -37,7 +38,7 @@ class BuildAndAcquisitionTests(unittest.TestCase):
             root = Path(tmp)
             lock = root / '.build-in-progress'
             lock.mkdir()
-            env = {**os.environ, 'DATA_DIR': tmp, 'BIKESY_REGION': 'sf'}
+            env = {**os.environ, 'DATA_DIR': tmp}
             result = subprocess.run(['bash', str(script)], env=env, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue(lock.exists())

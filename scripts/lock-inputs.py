@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('data', type=Path)
 parser.add_argument('config', type=Path)
 parser.add_argument('--verify', action='store_true')
+parser.add_argument('--build-lock', type=Path, help='Also export a flat input lock for the regional review directory')
 parser.add_argument('--osm-source', help='Dated OSM extract URL or provenance description')
 parser.add_argument('--dem-source', help='DEM source URL and acquisition date')
 args = parser.parse_args()
@@ -24,6 +25,10 @@ for lat in range(math.floor(bounds['bottom']), math.floor(bounds['top']) + 1):
         ew = f'{"E" if lon >= 0 else "W"}{abs(lon):03}'
         required.append(Path('elevation') / ns / f'{ns}{ew}.hgt')
 files = [Path('region.osm.pbf'), *sorted(p.relative_to(root) for p in (root / 'elevation').rglob('*') if p.is_file())]
+if (root / 'admin-input.osm.pbf').is_file():
+    files.append(Path('admin-input.osm.pbf'))
+if args.build_lock and (args.build_lock.exists() or Path('admin-input.osm.pbf') not in files):
+    parser.error('--build-lock requires admin-input.osm.pbf and a new output path')
 for relative in required:
     path = root / relative
     if not path.is_file() or path.stat().st_size not in (1201 * 1201 * 2, 3601 * 3601 * 2):
@@ -48,3 +53,9 @@ else:
                    'dem_source': args.dem_source, 'sha256': checksums}, out, indent=2)
         out.write('\n')
     print(lockpath)
+
+if args.build_lock:
+    args.build_lock.parent.mkdir(parents=True, exist_ok=True)
+    with args.build_lock.open('x') as out:
+        json.dump(checksums, out, indent=2)
+        out.write('\n')

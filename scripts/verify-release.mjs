@@ -1,3 +1,4 @@
+import { verifyRegionData } from '../src/config.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, dirname } from 'node:path';
@@ -16,10 +17,15 @@ export function verifyRelease({
   }
   const lockPath = resolve(root, 'graph/deployed-runtime.lock.json');
   if (sha(lockPath) !== release.data_lock_sha256) throw Error('Data lock differs from release');
+  const lock = JSON.parse(readFileSync(lockPath));
+  const region = release.region || 'sf';
+  if ((lock.region || 'sf') !== region) {
+    throw Error('Routing data region differs from release');
+  }
+  verifyRegionData(JSON.parse(readFileSync(resolve(root, `config/${region}.json`))), lock);
   if (image) {
     if (sha(resolve(dataRoot, 'engine-policy.json')) !== release.data_lock_sha256)
       throw Error('Base image data release mismatch');
-    const lock = JSON.parse(readFileSync(lockPath));
     if (lock.engine_sha256 !== release.engine_sha256) throw Error('Engine release identity mismatch');
     // Always exhaustive, regardless of BIKESY_DATA_VERIFICATION or startup policy.
     for (const [name, expected] of Object.entries(lock.files)) {

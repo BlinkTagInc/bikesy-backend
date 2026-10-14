@@ -1,18 +1,45 @@
 {
   "bounds": {
-    "left": -120.345042,
-    "bottom": 38.750276,
-    "right": -119.659482,
-    "top": 39.368232
+    "left": -120.5,
+    "bottom": 38.65,
+    "right": -119.55,
+    "top": 39.5
   },
   "scenarios": {
     "1": {
       "use_hills": 0.5,
-      "use_roads": 0
+      "use_roads": 0,
+      "maneuver_penalty": 2
     },
     "2": {
       "use_hills": 0.5,
-      "use_roads": 1
+      "use_roads": 1,
+      "maneuver_penalty": 2
     }
+  },
+  "engine_policy": "bikesy-distance-v1",
+  "region": "tahoe",
+  "admin_states": [
+    "CA",
+    "NV"
+  ],
+  "readiness": {
+    "locations": [
+      {
+        "lat": 39.1667,
+        "lon": -120.1439
+      },
+      {
+        "lat": 39.1725,
+        "lon": -120.1385
+      }
+    ],
+    "scenario": "1"
+  },
+  "bounds_inset": {
+    "left": 0.100186,
+    "bottom": 0.100276,
+    "right": 0.109482,
+    "top": 0.131768
   }
 }
