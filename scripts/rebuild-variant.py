@@ -52,6 +52,8 @@ for name in ['region.osm.pbf', 'admin-input.osm.pbf']:
         raise ValueError(f'Missing locked input: {name}')
 for name, digest in locked.items():
     path = (D / name).resolve()
+    if path.is_relative_to(D) and not path.is_file():
+        raise ValueError(f'Missing input file: {name} in {D}')
     if not path.is_relative_to(D) or sha(path) != digest:
         raise ValueError(f'Input mismatch: {name}')
 # Check DEM coverage for the extraction buffer, not just service bounds.

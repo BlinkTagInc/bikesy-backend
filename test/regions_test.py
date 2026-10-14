@@ -17,13 +17,14 @@ class RegionBuildTests(unittest.TestCase):
     def run_script(self, script, *args):
         return subprocess.run([sys.executable, str(ROOT / 'scripts' / script), *map(str, args)], capture_output=True, text=True)
 
-    def test_region_without_review_fails_before_build(self):
+    def test_tahoe_uses_committed_review_and_requires_its_inputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / 'build'
-            result = self.run_script('rebuild-variant.py', '--project', ROOT, '--region', 'tahoe', '--output', output)
+            result = self.run_script('rebuild-variant.py', '--project', ROOT, '--data', Path(tmp) / 'data',
+                                     '--region', 'tahoe', '--output', output)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("No reviewed inputs for region 'tahoe'", result.stderr)
-            self.assertIn('pass --review', result.stderr)
+            self.assertNotIn('No reviewed inputs', result.stderr)
+            self.assertIn('Missing input file: region.osm.pbf', result.stderr)
             self.assertFalse(output.exists())
 
     def test_unknown_region_lists_available_configs(self):
