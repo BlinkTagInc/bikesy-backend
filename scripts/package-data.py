@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Package a gated rebuild into a NEW private runtime-image build context."""
-from region_common import region_name
+from region_common import load_region_config, region_name
 import sys
 import argparse,pathlib,json,hashlib,shutil
 p=argparse.ArgumentParser(description=__doc__)
@@ -16,8 +16,7 @@ assert (e/'engine-cost-tests.json').stat().st_size and (e/'access-invariants.jso
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 receipt=json.loads((e/'gated-build.json').read_text());assert receipt['passed']
 assert receipt['region']==a.region and gate['region']==a.region
-config=json.loads((root/'config'/f'{a.region}.json').read_text())
-assert config['region']==a.region
+config=load_region_config(a.region,root)
 assert {key:config[key] for key in ['bounds','admin_states']}==receipt['build_config']
 for name,digest in receipt['review_files'].items():assert sha(e/name)==digest,name
 assert sha(root/'engine/out/valhalla_service')==receipt['engine_sha256']

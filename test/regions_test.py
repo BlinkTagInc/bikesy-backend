@@ -17,13 +17,50 @@ class RegionBuildTests(unittest.TestCase):
     def run_script(self, script, *args):
         return subprocess.run([sys.executable, str(ROOT / 'scripts' / script), *map(str, args)], capture_output=True, text=True)
 
-    def test_tahoe_requires_review_before_build(self):
+    def test_region_without_review_fails_before_build(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / 'build'
             result = self.run_script('rebuild-variant.py', '--project', ROOT, '--region', 'tahoe', '--output', output)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn('Tahoe requires --review', result.stderr)
+            self.assertIn("No reviewed inputs for region 'tahoe'", result.stderr)
+            self.assertIn('pass --review', result.stderr)
             self.assertFalse(output.exists())
+
+    def test_unknown_region_lists_available_configs(self):
+        for script, args in [('rebuild-variant.py', ['--project', ROOT, '--region', 'reno']),
+                             ('prepare-release.py', ['--region', 'reno', '--runtime', ROOT / 'missing', '--bundle-data', '--output', ROOT / 'build/never'])]:
+            with self.subTest(script=script):
+                result = self.run_script(script, *args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Unknown region 'reno'", result.stderr + result.stdout)
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        try:
+            from region_common import available_regions
+        finally:
+            sys.path.pop(0)
+        self.assertEqual(available_regions(), sorted(p.stem for p in (ROOT / 'config').glob('*.json') if not p.stem.startswith('valhalla-')))
+
+    def test_new_region_defaults_to_its_own_review_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / 'project'
+            (project / 'config').mkdir(parents=True)
+            config = json.loads((ROOT / 'config/tahoe.json').read_text())
+            config['region'] = 'reno'
+            (project / 'config/reno.json').write_text(json.dumps(config))
+            (project / 'graph').mkdir()
+            (project / 'graph/quality.json').write_text((ROOT / 'graph/quality.json').read_text())
+            args = ['--project', project, '--data', Path(tmp) / 'data', '--region', 'reno', '--output', Path(tmp) / 'build']
+            result = self.run_script('rebuild-variant.py', *args)
+            self.assertIn("No reviewed inputs for region 'reno'", result.stderr)
+            review = project / 'graph/reno'
+            review.mkdir()
+            (review / 'quality.json').write_text(json.dumps({'region': 'reno', 'minimum_bicycle_nodes': 1, 'expected_walking_edges': 0, 'facilities': [{'way': 1, 'cyclelane': 1}]}))
+            (review / 'inputs.lock.json').write_text('{}')
+            result = self.run_script('rebuild-variant.py', *args)
+            # The default review directory was accepted; the input lock gate is next.
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Missing locked input: region.osm.pbf', result.stderr)
+            self.assertFalse((Path(tmp) / 'build').exists())
 
     def test_build_lock_includes_admin_and_detects_admin_tampering(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -62,7 +99,9 @@ class RegionBuildTests(unittest.TestCase):
             self.assertNotEqual(check(rows).returncode, 0)
 
     def test_prepare_context_binds_each_region_and_rejects_tampering(self):
-        for region in ['sf', 'tahoe']:
+        regions = sorted(p.stem for p in (ROOT / 'config').glob('*.json') if 'region' in json.loads(p.read_text()))
+        self.assertIn('tahoe', regions)
+        for region in regions:
             with self.subTest(region=region), tempfile.TemporaryDirectory() as tmp:
                 p = Path(tmp)
                 runtime = p / 'runtime'
