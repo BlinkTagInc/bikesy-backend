@@ -1,5 +1,5 @@
-"""Build an offline SF or Tahoe data release inside the pinned toolchain."""
-from region_common import region_name
+"""Build an offline regional data release inside the pinned toolchain."""
+from region_common import ADDING_A_REGION, default_review_dir, load_region_config, region_name
 import sys
 import argparse
 import hashlib
@@ -13,19 +13,18 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--project', type=Path, default=Path('/work'))
 parser.add_argument('--data', type=Path, default=Path('/data'))
 parser.add_argument('--region', type=region_name, default='sf')
-parser.add_argument('--review', type=Path, help='Reviewed input lock, facility checks and access baselines')
+parser.add_argument('--review', type=Path, help='Reviewed input lock, facility checks and access baselines; defaults to PROJECT/graph/REGION, or PROJECT/graph for SF')
 parser.add_argument('--output', type=Path, help='Build/evidence directory; defaults to PROJECT/build/REGION')
 args = parser.parse_args()
 W, D = args.project.resolve(), args.data.resolve()
 B = (args.output or W / 'build' / args.region).resolve()
 E, engine = B / 'evidence', W / 'engine'
-review = (args.review or W / 'graph').resolve()
-config = json.loads((W / 'config' / f'{args.region}.json').read_text())
-if config['region'] != args.region:
-    parser.error('Config region identity does not match --region')
+review = (args.review or default_review_dir(args.region, W)).resolve()
+config = load_region_config(args.region, W)
 build_config = {key: config[key] for key in ['bounds', 'admin_states']}
-if args.region != 'sf' and args.review is None:
-    parser.error('Tahoe requires --review with Tahoe input hashes and reviewed facility checks; see docs/REGIONS.md')
+quality_path = review / 'quality.json'
+if not quality_path.is_file() or json.loads(quality_path.read_text()).get('region') != args.region:
+    parser.error(f'No reviewed inputs for region {args.region!r} in {review}; pass --review DIR or add graph/{args.region}/. See {ADDING_A_REGION}')
 
 def sha(path):
     with path.open('rb') as stream:
@@ -53,6 +52,8 @@ for name in ['region.osm.pbf', 'admin-input.osm.pbf']:
         raise ValueError(f'Missing locked input: {name}')
 for name, digest in locked.items():
     path = (D / name).resolve()
+    if path.is_relative_to(D) and not path.is_file():
+        raise ValueError(f'Missing input file: {name} in {D}')
     if not path.is_relative_to(D) or sha(path) != digest:
         raise ValueError(f'Input mismatch: {name}')
 # Check DEM coverage for the extraction buffer, not just service bounds.

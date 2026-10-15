@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Create an isolated application Docker context bound to a packaged regional data image."""
-from region_common import region_name
+from region_common import load_region_config, region_name
 import sys
 import argparse
 import hashlib
@@ -20,6 +20,7 @@ parser.add_argument('--vercel-region', default='sfo1', help='Compute region, sep
 parser.add_argument('--output', type=Path, required=True, help='New application build context')
 a = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
+config = load_region_config(a.region, root)
 source = a.runtime.resolve()
 output = a.output.resolve()
 if a.image and not re.fullmatch(r'[^\s]+@sha256:[0-9a-f]{64}', a.image):
@@ -45,8 +46,7 @@ if not {'valhalla.json', 'admin.sqlite', 'bikesy-policy.bin', 'bikesy-stairs.txt
     parser.error('Packaged data is missing required runtime files')
 if lock.get('region') != a.region:
     parser.error('Packaged data region does not match --region')
-config = json.loads((root / 'config' / f'{a.region}.json').read_text())
-if config['region'] != a.region or lock.get('build_config') != {key: config[key] for key in ['bounds', 'admin_states']}:
+if lock.get('build_config') != {key: config[key] for key in ['bounds', 'admin_states']}:
     parser.error('Packaged data uses different build settings; rebuild data before changing its bounds/admin states')
 if sha(source / 'engine/valhalla_service') != lock['engine_sha256']:
     parser.error('Packaged engine differs from manifest')

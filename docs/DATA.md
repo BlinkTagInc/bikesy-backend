@@ -2,7 +2,7 @@
 
 Normal Git pushes reuse the already-hosted immutable runtime image. No PBF, DEM, tiles, database or executable belongs in Git. The bootstrap data artifact is the existing VCR digest in `release.json`; no object-storage upload is needed.
 
-For Tahoe or separate regional application images, follow [REGIONS.md](REGIONS.md). SF remains the default; region-specific build evidence now lives under `build/sf/` or `build/tahoe/`.
+For Tahoe, new regions or separate regional application images, follow [REGIONS.md](REGIONS.md). SF remains the default; region-specific build evidence lives under `build/REGION/`.
 
 ## Rebuild prerequisites
 
